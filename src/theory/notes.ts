@@ -43,7 +43,7 @@ export function parseNote(input: string): Note {
   if (!m) throw new Error(`Cannot parse note "${input}"`);
   const letter = LETTERS.indexOf(m[1].toUpperCase() as Letter);
   const accStr = m[2];
-  const acc = accStr.startsWith('#') ? accStr.length : -accStr.length;
+  const acc = accStr.startsWith('#') ? accStr.length : accStr.length ? -accStr.length : 0;
   return { letter, acc };
 }
 

@@ -120,26 +120,57 @@ export function playNote(midi: number, delay = 0, gain = 0.8): void {
   if (ac) playNoteAt(midi, ac.currentTime + 0.02 + delay, gain);
 }
 
-/** Play one note at an absolute AudioContext time (used by the metronome's scheduler). */
-export function playNoteAt(midi: number, when: number, gain = 0.8): void {
+/**
+ * Play one note at an absolute AudioContext time (used by the scheduler).
+ * With `duration`, the note is damped after that many seconds (a muted "chuck").
+ */
+export function playNoteAt(midi: number, when: number, gain = 0.8, duration?: number): void {
   if (muted) return;
   const ac = context();
   if (!ac || !master) return;
   const src = ac.createBufferSource();
   src.buffer = stringBuffer(ac, midi);
   const g = ac.createGain();
-  g.gain.value = gain;
+  g.gain.setValueAtTime(gain, when);
+  if (duration !== undefined) {
+    g.gain.setValueAtTime(gain, when + duration);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + duration + 0.04);
+  }
   src.connect(g).connect(master);
   src.start(when);
+  if (duration !== undefined) src.stop(when + duration + 0.05);
   active.add(src);
   src.onended = () => active.delete(src);
 }
 
-/** A short woodblock-style click at an absolute time. Level 2 = bar accent, 1 = beat, 0 = subdivision. */
-export function clickAt(when: number, level: 0 | 1 | 2): void {
+let noiseBuffer: AudioBuffer | null = null;
+
+/**
+ * A short click at an absolute time. Level 2 = bar accent, 1 = beat, 0 = subdivision.
+ * `quiet` uses a filtered noise tick with no pitch, so a microphone listening for
+ * notes is not fooled by it.
+ */
+export function clickAt(when: number, level: 0 | 1 | 2, quiet = false): void {
   if (muted) return;
   const ac = context();
   if (!ac || !master) return;
+  if (quiet) {
+    if (!noiseBuffer) {
+      noiseBuffer = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.03), ac.sampleRate);
+      const d = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+    }
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuffer;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 3000;
+    const g = ac.createGain();
+    g.gain.value = level === 2 ? 1 : level === 1 ? 0.7 : 0.35;
+    src.connect(hp).connect(g).connect(master);
+    src.start(when);
+    return;
+  }
   const osc = ac.createOscillator();
   const g = ac.createGain();
   osc.type = 'triangle';

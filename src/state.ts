@@ -1,8 +1,9 @@
 import { type Note, n, noteName, SCALES, CHORDS } from './theory';
 
-export type View = 'circle' | 'fretboard' | 'modes' | 'capo' | 'practice';
+export type View = 'circle' | 'fretboard' | 'modes' | 'melody' | 'capo' | 'practice';
 export type Pattern = 'none' | 'caged' | '3nps';
 export type QuizKind = 'note' | 'fret-interval' | 'ear-interval' | 'ear-chord';
+export type MelodyTab = 'tunes' | 'licks' | 'random' | 'changes';
 export type FretMode = 'scale' | 'chord' | 'triads' | 'notes';
 export type LabelMode = 'names' | 'intervals' | 'none';
 
@@ -34,6 +35,10 @@ export interface State {
   capoFret: number;
   /* Practice */
   quiz: QuizKind;
+  /* Melody */
+  melodyTab: MelodyTab;
+  tuneId: string;
+  lickId: string;
   /** Triad string set, as index of the lowest string. */
   triadSet: number;
   modesView: 'parallel' | 'relative';
@@ -59,6 +64,9 @@ const initial: State = {
   capoShape: 'G',
   capoFret: 2,
   quiz: 'note',
+  melodyTab: 'tunes',
+  tuneId: 'soldiers-joy',
+  lickId: 'g-run',
   triadSet: 3,
   modesView: 'parallel',
 };
@@ -96,7 +104,7 @@ export function fromHash(): Partial<State> {
   const [view, query = ''] = location.hash.replace(/^#/, '').split('?');
   const p = new URLSearchParams(query);
   const out: Partial<State> = {};
-  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'capo' || view === 'practice') out.view = view;
+  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'melody' || view === 'capo' || view === 'practice') out.view = view;
   try {
     if (p.get('root')) out.root = n(p.get('root')!);
   } catch {

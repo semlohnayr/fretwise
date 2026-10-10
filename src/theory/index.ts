@@ -8,3 +8,8 @@ export * from './voicings';
 export * from './capo';
 export * from './quiz';
 export * from './tempo';
+export * from './abc';
+export * from './tab';
+export * from './melodygen';
+export * from './backing';
+export * from './pitch';

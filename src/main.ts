@@ -4,15 +4,17 @@ import { renderCircle } from './ui/circle';
 import { renderFretboard } from './ui/fretboard';
 import { renderModes } from './ui/modes';
 import { renderCapo } from './ui/capo';
+import { renderMelody } from './ui/melody';
 import { renderPractice } from './ui/practice';
 import { isMuted, setMuted, onMuteChange, audioSupported } from './audio';
 import { initMetronome } from './ui/metronome';
-import { setGuide } from './metronome';
+import { setTrack } from './metronome';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'circle', label: 'Circle of fifths' },
   { id: 'fretboard', label: 'Fretboard' },
   { id: 'modes', label: 'Modes' },
+  { id: 'melody', label: 'Melody' },
   { id: 'capo', label: 'Capo' },
   { id: 'practice', label: 'Practice' },
 ];
@@ -37,7 +39,7 @@ function render(st: State): void {
       return a;
     }),
   );
-  context.parentElement!.hidden = st.view === 'capo' || st.view === 'practice';
+  context.parentElement!.hidden = st.view === 'capo' || st.view === 'practice' || st.view === 'melody';
   context.textContent = `${noteName(st.root)}${st.keyQuality === 'minor' && st.view === 'circle' ? ' minor' : ''}`;
 
   // Keep focus and scroll stable when re-rendering the same view.
@@ -45,11 +47,12 @@ function render(st: State): void {
   const scroller = main.querySelector('.neck-scroll');
   const neckScroll = scroller?.scrollLeft ?? 0;
 
-  // Only the fretboard supplies play-along notes.
-  if (st.view !== 'fretboard') setGuide(null);
+  // Only the fretboard and melody pages supply something to play along with.
+  if (st.view !== 'fretboard' && st.view !== 'melody') setTrack(null);
   if (st.view === 'circle') renderCircle(main, st);
   else if (st.view === 'fretboard') renderFretboard(main, st);
   else if (st.view === 'modes') renderModes(main, st);
+  else if (st.view === 'melody') renderMelody(main, st);
   else if (st.view === 'capo') renderCapo(main, st);
   else renderPractice(main, st);
 

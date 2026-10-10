@@ -9,7 +9,10 @@ import { getState, setState, type State, type FretMode, type Pattern } from '../
 import { h, s, select, segmented } from './dom';
 import { degreeClass, noteRow, rootPicker, playButton } from './controls';
 import { playNote, playChord, playSequence, playProgression, scaleMidis, chordMidis } from '../audio';
-import { setGuide, type GuideNote } from '../metronome';
+import { setTrack, guideTrack } from '../metronome';
+import { markPos } from './highlight';
+
+type GuideNote = { midi: number; pos: string };
 
 const TRIAD_IDS = ['maj', 'min', 'dim', 'aug', 'sus2', 'sus4'];
 const INLAYS = [3, 5, 7, 9, 15, 17, 19, 21];
@@ -454,7 +457,7 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     guide = notes.sort((a, b) => a.midi - b.midi);
     guideLabel = `${r.title}, ${sh.name} shape`;
   }
-  setGuide(guide, guideLabel);
+  setTrack(guide && guide.length ? guideTrack(guide, guideLabel, markPos) : null);
 
   // What the play button plays depends on what is highlighted.
   const semis = r.intervals.map((i) => i.semitones);
@@ -556,15 +559,19 @@ export interface NeckMark {
 }
 
 /** A plain neck with arbitrary marks, used by the practice quizzes. */
-export function neckSvg(tn: Tuning, frets: number, marks: NeckMark[]): SVGElement {
+export function neckSvg(tn: Tuning, frets: number, marks: NeckMark[], capo = 0): SVGElement {
   const g = geometry(tn.strings.length, frets);
   const svg = s('svg', { viewBox: `0 0 ${g.width} ${g.height}`, width: g.width, height: g.height, class: 'fretboard', role: 'img', 'aria-label': 'Fretboard' });
   svg.append(drawBoard(g, tn, frets));
+  if (capo > 0) {
+    // The capo sits just behind its fret wire.
+    svg.append(s('rect', { x: g.x(capo) - 9, y: g.boardTop - 6, width: 10, height: g.boardBottom - g.boardTop + 12, rx: 4, class: 'capo-bar' }));
+  }
   for (const m of marks) {
     svg.append(
-      s('g', { class: `dot ${m.cls}`, transform: `translate(${g.cx(m.fret)} ${g.y(m.string)})` },
+      s('g', { class: `dot ${m.cls}`, transform: `translate(${g.cx(m.fret)} ${g.y(m.string)})`, 'data-pos': `${m.string}:${m.fret}` },
         s('circle', { r: 13 }),
-        m.label ? s('text', { y: 4.5 }, m.label) : null),
+        m.label ? s('text', { y: 4.5, class: m.label.length > 2 ? 'small' : '' }, m.label) : null),
     );
   }
   return svg;

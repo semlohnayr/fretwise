@@ -2,11 +2,11 @@ import * as metro from '../metronome';
 import { rampLength, tapTempo, MIN_BPM, MAX_BPM } from '../theory/tempo';
 import { isMuted } from '../audio';
 import { h, segmented } from './dom';
+import { markNow } from './highlight';
 
 let dock: HTMLElement | null = null;
 let open = false;
 const taps: number[] = [];
-let lastGuideDot: Element | null = null;
 // On small screens the settings start folded away so the neck stays visible.
 let showSettings = typeof matchMedia === 'undefined' || !matchMedia('(max-width: 600px)').matches;
 
@@ -41,7 +41,7 @@ function build(): HTMLElement {
   const st = metro.settings;
   const running = metro.isRunning();
   const tempo = running ? metro.currentTempo() : st.rampOn ? st.ramp.from : st.bpm;
-  const guide = metro.guideInfo();
+  const track = metro.currentTrack();
   const setBpm = (v: number) => metro.update({ bpm: v });
 
   const lights = h(
@@ -130,11 +130,12 @@ function build(): HTMLElement {
       { class: 'metro-row' },
       h('label', { class: 'toggle' },
         h('input', { type: 'checkbox', checked: st.guide, onchange: (e: Event) => metro.update({ guide: (e.target as HTMLInputElement).checked }) }),
-        'Play the highlighted position along with the click'),
+        'Play along'),
+      h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: st.click, onchange: (e: Event) => metro.update({ click: (e.target as HTMLInputElement).checked }) }), 'Click'),
       h('p', { class: 'guide-status' },
-        guide.available
-          ? `Now: ${guide.label}. One note per click, up and back down.`
-          : 'To use this, open the Fretboard page and pick a 3-per-string position or a single CAGED shape for a scale.'),
+        track
+          ? `Now: ${track.label}.`
+          : 'Pick a 3-per-string position or a single CAGED shape on the Fretboard page, or a tune, lick or melody on the Melody page, to play along with the click.'),
     ),
     ),
     isMuted() ? h('p', { class: 'error' }, 'Sound is off, so only the beat lights will move.') : null,
@@ -160,10 +161,6 @@ function onTick(e: metro.TickEvent): void {
     const ramp = dock.querySelector('#metro-ramp');
     if (ramp) ramp.textContent = rampSummary(e.bpm, e.rampBar);
   }
-  // Light up the note being played on the fretboard.
-  lastGuideDot?.classList.remove('now');
-  lastGuideDot = e.guidePos ? document.querySelector(`.fretboard .dot[data-pos="${e.guidePos}"]`) : null;
-  lastGuideDot?.classList.add('now');
 }
 
 let rendering = false;
@@ -196,10 +193,7 @@ function renderNow(): void {
   toggleBtn?.setAttribute('aria-expanded', String(open));
   toggleBtn?.classList.toggle('running', metro.isRunning());
   if (open) dock.replaceChildren(build());
-  if (!metro.isRunning()) {
-    lastGuideDot?.classList.remove('now');
-    lastGuideDot = null;
-  }
+  if (!metro.isRunning()) markNow(null);
 }
 
 export function setOpen(v: boolean): void {

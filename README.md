@@ -37,6 +37,16 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - Relative view: the seven modes of one parent major key.
 - Characteristic note outlined on every row; detail panel with feel, harmony, examples, the mode's chords and links to the fretboard and circle.
 
+**Melody**
+- Fiddle tunes: Soldier's Joy, Old Joe Clark, Salt Creek, Red Haired Boy and Billy in the Lowground, each linked to the published transcription it is based on. Practice the whole tune, one part, or a two-bar phrase on a loop, with or without the usual capo.
+- Add your own tunes by pasting ABC notation (the format most fiddle-tune sites offer); they are saved in your browser.
+- Licks: the G run, bass walks, a crosspicking roll, hammer-on and pull-off licks, a pentatonic run and a tag ending, in any key.
+- Random melody: new singable melodies in any key and scale, at your choice of length and rhythm.
+- Over the changes: a boom-chuck backing for common progressions (including twelve-bar blues and an eight-bar bluegrass form) while the neck shows the current chord's tones.
+- Everything is shown as proportionally spaced tab with pick strokes (alternate, economy, or the lick's own pattern), hammer-ons and pull-offs, and chord symbols, plus the notes on the neck. The note being played lights up in both.
+- Playback runs through the metronome, so the count-in, click and speed trainer all apply, with an optional boom-chuck backing from the tune's chords.
+- Grade my playing: play the phrase into your microphone after a count-in and get each note marked right, wrong octave, wrong note or not heard, with your average timing (rushing or dragging). A one-time calibration measures your microphone's delay. Grading listens for each pick attack and the new pitch at that moment, so strings ringing over each other do not throw it off.
+
 **Capo**
 - Pick the key you need to sound in and see which open-chord keys (G, C, D, A, E; Em, Am, Dm) get you there and on which fret.
 - Translate any shape key and capo position chord by chord into the sounding key, with playback at concert pitch.
@@ -90,6 +100,11 @@ src/
     capo.ts        Capo calculator
     quiz.ts        Practice question generators (seedable)
     tempo.ts       Tempo ramp, tap tempo and click-pattern helpers
+    abc.ts         ABC notation parser, repeats, parts and timelines
+    tab.ts         Automatic fingering and pick direction
+    melodygen.ts   Random melody generator
+    backing.ts     Chord symbols and boom-chuck backing
+    pitch.ts       Pitch detection, recording analysis and grading
   ui/              View rendering (plain DOM + SVG, no framework)
     circle.ts      Circle of fifths view
     fretboard.ts   Fretboard view
@@ -97,10 +112,15 @@ src/
     capo.ts        Capo view
     practice.ts    Practice quizzes
     metronome.ts   Metronome dock
+    melody.ts      Melody page
+    tab.ts         Tab renderer
+    highlight.ts   Marks the note that is sounding
     controls.ts    Shared pickers and note chips
     dom.ts         Tiny element helpers
   audio.ts         Plucked-string synth and metronome click (Web Audio)
-  metronome.ts     Look-ahead metronome scheduler, speed trainer, play-along
+  metronome.ts     Look-ahead scheduler: click, speed trainer, play-along tracks
+  mic.ts           Microphone input for grading
+  content/         Tunes and licks (ABC)
   state.ts         Shared app state and URL hash sync
   main.ts          Navigation and rendering
   styles.css
@@ -108,6 +128,7 @@ tests/
   theory.test.ts   Spelling, keys, harmonization, CAGED and triad tests
   features.test.ts String pitches, 3NPS, voicings, capo, quizzes, synth tuning
   tempo.test.ts    Tempo ramp, tap tempo, click accents
+  melody.test.ts   ABC parsing, bundled tunes, fingering, picking, melodies, backing, grading
 ```
 
 The theory engine has no DOM dependencies, so it can be reused elsewhere (a CLI, a different UI) or extended with tests first.
@@ -116,7 +137,8 @@ The theory engine has no DOM dependencies, so it can be reused elsewhere (a CLI,
 
 - Left-handed (mirrored) fretboard.
 - Inversions and drop voicings in the voicing library.
-- Melody practice: call-and-response ear training, melodic dictation and fiddle-tune phrases.
+- Call-and-response and scale-degree dictation ear training.
+- More tunes, and B-part endings and variations.
 
 ## License
 
