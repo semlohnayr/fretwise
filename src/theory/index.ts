@@ -4,3 +4,6 @@ export * from './scales';
 export * from './chords';
 export * from './keys';
 export * from './fretboard';
+export * from './voicings';
+export * from './capo';
+export * from './quiz';

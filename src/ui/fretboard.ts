@@ -1,12 +1,14 @@
 import {
-  type Interval, type Note, type Tuning, type CagedShape, type TriadVoicing,
+  type Interval, type Note, type Tuning, type CagedShape, type TriadVoicing, type NpsPosition, type Voicing,
   SCALES, CHORDS, TUNINGS, scaleById, chordById, scaleNotes, chordNotes, chordSymbol,
-  noteName, pc, fretPc, isStandard, parseTuning, cagedShapes, triadVoicings,
+  noteName, pc, fretPc, isStandard, parseTuning, cagedShapes, triadVoicings, threeNps,
+  chordVoicings, voicingName, stringMidis,
   INVERSION_NAMES, intervalLabel, intervalName, tuningLabel,
 } from '../theory';
-import { getState, setState, type State, type FretMode } from '../state';
+import { getState, setState, type State, type FretMode, type Pattern } from '../state';
 import { h, s, select, segmented } from './dom';
-import { degreeClass, noteRow, rootPicker } from './controls';
+import { degreeClass, noteRow, rootPicker, playButton } from './controls';
+import { playNote, playChord, playSequence, playProgression, scaleMidis, chordMidis } from '../audio';
 
 const TRIAD_IDS = ['maj', 'min', 'dim', 'aug', 'sus2', 'sus4'];
 const INLAYS = [3, 5, 7, 9, 15, 17, 19, 21];
@@ -147,7 +149,7 @@ function drawBoard(g: Geo, tn: Tuning, frets: number): SVGElement {
   return board;
 }
 
-function dot(g: Geo, string: number, fret: number, m: Marked, st: State, extra = ''): SVGElement {
+function dot(g: Geo, string: number, fret: number, m: Marked, st: State, extra = '', midi?: number): SVGElement {
   const label = st.labels === 'names' ? noteName(m.note) : st.labels === 'intervals' ? intervalLabel(m.interval) : '';
   const el = s(
     'g',
@@ -156,6 +158,7 @@ function dot(g: Geo, string: number, fret: number, m: Marked, st: State, extra =
     label ? s('text', { y: 4.5, class: label.length > 2 ? 'small' : '' }, label) : null,
   );
   el.append(s('title', {}, `${noteName(m.note)}, ${intervalName(m.interval)} (string ${string + 1} from the bottom, fret ${fret})`));
+  if (midi !== undefined) el.addEventListener('click', () => playNote(midi));
   return el;
 }
 
@@ -168,7 +171,7 @@ function drawCaged(g: Geo, shapes: CagedShape[], focus: string): SVGElement {
     const [lo, hi] = sh.window;
     const x0 = lo === 0 ? g.nutX - 44 : g.x(lo - 1) + 2;
     const x1 = g.x(hi) - 2;
-    // Alternate band heights so overlapping neighbours stay readable.
+    // Alternate band heights so overlapping neighbors stay readable.
     const inset = focus === 'all' ? (i % 2 ? 6 : 0) : 0;
     layer.append(
       s('rect', { x: x0, y: g.boardTop - 18 + inset, width: x1 - x0, height: g.boardBottom - g.boardTop + 36 - inset * 2, rx: 8, class: `caged-band ${CAGED_CLASS[sh.name]}` }),
@@ -182,17 +185,63 @@ function inWindow(sh: CagedShape, fret: number): boolean {
   return fret >= sh.window[0] && fret <= sh.window[1];
 }
 
-function drawTriads(g: Geo, voicings: TriadVoicing[], r: Resolved, st: State): SVGElement {
+function drawTriads(g: Geo, voicings: TriadVoicing[], r: Resolved, st: State, opens: number[]): SVGElement {
   const layer = s('g', { class: 'triads' });
   const marks = [...r.marks.values()];
   for (const v of voicings) {
     const pts = v.strings.map((str, i) => `${g.cx(v.frets[i])},${g.y(str)}`).join(' ');
-    layer.append(s('polyline', { points: pts, class: `triad-line inv-${v.inversion}` }));
+    const line = s('polyline', { points: pts, class: `triad-line inv-${v.inversion}` });
+    // Clicking the connecting line strums that triad.
+    line.addEventListener('click', () => playChord(v.strings.map((str, i) => opens[str] + v.frets[i])));
+    layer.append(line);
   }
   for (const v of voicings) {
-    v.strings.forEach((str, i) => layer.append(dot(g, str, v.frets[i], marks[v.tones[i]], st)));
+    v.strings.forEach((str, i) => layer.append(dot(g, str, v.frets[i], marks[v.tones[i]], st, '', opens[str] + v.frets[i])));
   }
   return layer;
+}
+
+function drawNps(g: Geo, pos: NpsPosition): SVGElement {
+  const lo = pos.minFret;
+  const hi = pos.maxFret;
+  const x0 = lo === 0 ? g.nutX - 44 : g.x(lo - 1) + 2;
+  const x1 = g.x(hi) - 2;
+  return s(
+    'g',
+    { class: 'caged-layer' },
+    s('rect', { x: x0, y: g.boardTop - 18, width: x1 - x0, height: g.boardBottom - g.boardTop + 36, rx: 8, class: 'caged-band nps-band' }),
+    s('text', { x: (x0 + x1) / 2, y: g.boardTop - 6, class: 'caged-label' }, `Position ${pos.number}`),
+  );
+}
+
+/* ---------- Chord diagrams ---------- */
+
+function chordDiagram(v: Voicing, intervals: Interval[], strings: number): SVGElement {
+  const fretted = v.frets.filter((f): f is number => f !== null && f > 0);
+  const maxF = fretted.length ? Math.max(...fretted) : 0;
+  const start = maxF <= 5 ? 1 : v.baseFret;
+  const rows = 5;
+  const gap = 15;
+  const left = 20;
+  const top = 24;
+  const w = left + gap * (strings - 1) + 18;
+  const hgt = top + rows * 18 + 10;
+  const x = (i: number) => left + gap * i;
+  const y = (f: number) => top + (f - start + 0.5) * 18;
+  const svg = s('svg', { viewBox: `0 0 ${w} ${hgt}`, width: w, height: hgt, class: 'diagram', 'aria-hidden': 'true' });
+  for (let r = 0; r <= rows; r++) svg.append(s('line', { x1: x(0), x2: x(strings - 1), y1: top + r * 18, y2: top + r * 18, class: r === 0 && start === 1 ? 'dg-nut' : 'dg-fret' }));
+  for (let i = 0; i < strings; i++) svg.append(s('line', { x1: x(i), x2: x(i), y1: top, y2: top + rows * 18, class: 'dg-string' }));
+  if (start > 1) svg.append(s('text', { x: 2, y: y(start) + 4, class: 'dg-base' }, `${start}`));
+  if (v.barre) svg.append(s('rect', { x: x(v.barre.from) - 6, y: y(v.barre.fret) - 6, width: x(v.barre.to) - x(v.barre.from) + 12, height: 12, rx: 6, class: 'dg-barre' }));
+  v.frets.forEach((f, i) => {
+    if (f === null) svg.append(s('text', { x: x(i), y: top - 8, class: 'dg-mark' }, '×'));
+    else if (f === 0) svg.append(s('circle', { cx: x(i), cy: top - 11, r: 4, class: 'dg-open' }));
+    else {
+      const iv = intervals[v.tones[i]!];
+      svg.append(s('g', { class: `dg-dot ${degreeClass(iv)}` }, s('circle', { cx: x(i), cy: y(f), r: 6.5 })));
+    }
+  });
+  return svg;
 }
 
 /* ---------- Controls ---------- */
@@ -207,6 +256,13 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
   ];
   const cagedOk = standard && !!r.cagedQuality && (st.fretMode === 'scale' || st.fretMode === 'chord');
   const cagedTitle = !standard ? 'CAGED is defined for standard tuning' : !r.cagedQuality ? 'CAGED needs a major or minor sound' : undefined;
+  const npsOk = st.fretMode === 'scale' && r.notes.length === 7;
+  const pattern = effectivePattern(st, tn, r);
+  const patternOpts: { value: Pattern; label: string; disabled?: boolean; title?: string }[] = [
+    { value: 'none', label: 'None' },
+    { value: 'caged', label: 'CAGED', disabled: !cagedOk, title: cagedTitle },
+  ];
+  if (st.fretMode === 'scale') patternOpts.push({ value: '3nps', label: '3 per string', disabled: !npsOk, title: npsOk ? undefined : 'Needs a seven-note scale' });
   const stringSets = Array.from({ length: Math.max(0, tn.strings.length - 2) }, (_, i) => i);
   const num = (i: number) => tn.strings.length - i; // string numbers, 1 = highest
 
@@ -252,28 +308,28 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
         : null,
       select('Frets', String(st.frets), [12, 15, 17, 22, 24].map((f) => ({ value: String(f), label: String(f) })), (v) => setState({ frets: Number(v) })),
       segmented('Labels', st.labels, [{ value: 'intervals', label: 'Intervals' }, { value: 'names', label: 'Notes' }, { value: 'none', label: 'None' }], (labels) => setState({ labels })),
-      st.fretMode === 'scale' || st.fretMode === 'chord'
-        ? segmented(
-            'CAGED',
-            cagedOk ? st.caged : 'off',
-            (['off', 'all', 'C', 'A', 'G', 'E', 'D'] as const).map((v) => ({
-              value: v,
-              label: v === 'off' ? 'Off' : v === 'all' ? 'All' : v,
-              disabled: !cagedOk && v !== 'off',
-              title: cagedTitle,
-            })),
-            (caged) => setState({ caged }),
-          )
-        : null,
     ),
+    st.fretMode === 'scale' || st.fretMode === 'chord'
+      ? h(
+          'div',
+          { class: 'control-row' },
+          segmented('Pattern', pattern, patternOpts, (p) => setState({ pattern: p, voicing: null })),
+          pattern === 'caged'
+            ? segmented('Shape', st.caged, (['all', 'C', 'A', 'G', 'E', 'D'] as const).map((v) => ({ value: v, label: v === 'all' ? 'All' : v })), (caged) => setState({ caged }))
+            : null,
+          pattern === '3nps'
+            ? segmented('Position', String(st.npsPosition), [1, 2, 3, 4, 5, 6, 7].map((p) => ({ value: String(p), label: String(p) })), (v) => setState({ npsPosition: Number(v) }))
+            : null,
+        )
+      : null,
   );
 }
 
 /* ---------- Info panel ---------- */
 
-function info(st: State, r: Resolved, tn: Tuning, voicings: TriadVoicing[], cagedActive: boolean, shapes: CagedShape[]): HTMLElement {
+function info(st: State, r: Resolved, tn: Tuning, voicings: TriadVoicing[], cagedActive: boolean, shapes: CagedShape[], nps: NpsPosition | undefined, play: HTMLElement | null): HTMLElement {
   const parts: (HTMLElement | null)[] = [
-    h('h2', {}, r.title),
+    h('div', { class: 'title-row' }, h('h2', {}, r.title), play),
     st.fretMode !== 'notes' ? noteRow(r.notes, r.intervals) : null,
     h('p', { class: 'prose' }, r.blurb),
   ];
@@ -295,8 +351,17 @@ function info(st: State, r: Resolved, tn: Tuning, voicings: TriadVoicing[], cage
       h('div', { class: 'prose' },
         h('p', {}, `CAGED links the five open chord shapes (C, A, G, E and D) into a chain that covers the whole neck. Moved up to ${noteName(st.root)}, they run ${order} from the nut upward, each sharing notes with the next.`),
         h('p', {}, st.fretMode === 'scale'
-          ? 'Each coloured box is one scale position built around a chord shape. Learn the chord shape first, then the scale notes that surround it.'
+          ? 'Each colored box is one scale position built around a chord shape. Learn the chord shape first, then the scale notes that surround it.'
           : 'Ringed notes are the chord grip itself. The other chord tones in the box are there to find alternative voicings.'),
+      ),
+    );
+  }
+
+  if (nps) {
+    parts.push(
+      h('div', { class: 'prose' },
+        h('p', {}, `Three notes on every string, starting from scale degree ${nps.number} on the lowest string. Seven positions, one per scale degree, tile the whole neck and overlap with their neighbors.`),
+        h('p', {}, 'The even three-note groups make these patterns ideal for alternate picking and speed work: every string gets the same down-up-down (or up-down-up) motion.'),
       ),
     );
   }
@@ -317,40 +382,165 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
   const r = resolve(st);
   const g = geometry(tn.strings.length, st.frets);
 
-  const cagedActive = isStandard(tn) && !!r.cagedQuality && st.caged !== 'off' && (st.fretMode === 'scale' || st.fretMode === 'chord');
+  const opens = stringMidis(tn);
+  const pattern = effectivePattern(st, tn, r);
+  const cagedActive = pattern === 'caged';
   const shapes = cagedActive ? cagedShapes(st.root, r.cagedQuality!, st.frets) : [];
   const focusShapes = cagedActive && st.caged !== 'all' ? shapes.filter((x) => x.name === st.caged) : [];
+  const npsAll = pattern === '3nps' ? threeNps(tn, pc(st.root), r.intervals.map((i) => i.semitones), st.frets) : [];
+  const nps = npsAll.find((p) => p.number === st.npsPosition);
+  const npsSet = new Set<string>();
+  nps?.frets.forEach((fs, str) => fs.forEach((f) => npsSet.add(`${str}:${f}`)));
+
+  // Chord voicings (chord mode only).
+  const library = st.fretMode === 'chord' ? chordVoicings(tn, r.notes.map(pc), { maxFret: Math.min(st.frets, 17) }) : [];
+  const chosen = library.find((v) => voicingName(v) === st.voicing);
 
   const svg = s('svg', { viewBox: `0 0 ${g.width} ${g.height}`, width: g.width, height: g.height, class: 'fretboard', role: 'img', 'aria-label': `${r.title} on the fretboard` });
   svg.append(drawBoard(g, tn, st.frets));
   if (cagedActive) svg.append(drawCaged(g, shapes, st.caged));
+  if (nps) svg.append(drawNps(g, nps));
 
   let voicings: TriadVoicing[] = [];
   if (st.fretMode === 'triads') {
     const set = Math.min(st.triadSet, tn.strings.length - 3);
     voicings = triadVoicings(tn, r.notes.map(pc), [set, set + 1, set + 2], st.frets);
-    svg.append(drawTriads(g, voicings, r, st));
+    svg.append(drawTriads(g, voicings, r, st, opens));
   } else {
     const dots = s('g', { class: 'dots' });
     // Grip frets for ringed chord tones when a single CAGED shape is focused.
     const grip = new Set<string>();
     if (st.fretMode === 'chord') focusShapes.forEach((sh) => sh.frets.forEach((f, i) => f !== null && grip.add(`${i}:${f}`)));
+    const chosenSet = new Set<string>();
+    chosen?.frets.forEach((f, i) => f !== null && chosenSet.add(`${i}:${f}`));
     tn.strings.forEach((_, str) => {
       for (let f = 0; f <= st.frets; f++) {
         const m = r.marks.get(fretPc(tn, str, f));
         if (!m) continue;
+        const key = `${str}:${f}`;
         let extra = '';
-        if (focusShapes.length) extra = focusShapes.some((sh) => inWindow(sh, f)) ? '' : 'faded';
-        if (grip.has(`${str}:${f}`)) extra += ' grip';
-        dots.append(dot(g, str, f, m, st, extra));
+        if (chosen) extra = chosenSet.has(key) ? 'grip' : 'faded';
+        else {
+          if (focusShapes.length) extra = focusShapes.some((sh) => inWindow(sh, f)) ? '' : 'faded';
+          if (nps) extra = npsSet.has(key) ? '' : 'faded';
+          if (grip.has(key)) extra += ' grip';
+        }
+        dots.append(dot(g, str, f, m, st, extra, opens[str] + f));
       }
     });
     svg.append(dots);
   }
 
+  // What the play button plays depends on what is highlighted.
+  const semis = r.intervals.map((i) => i.semitones);
+  let play: HTMLElement | null = null;
+  if (st.fretMode === 'scale') {
+    const focused = nps
+      ? nps.frets.flatMap((fs, str) => fs.map((f) => opens[str] + f))
+      : focusShapes.length
+        ? positionsIn(tn, r, opens, st.frets, (f) => focusShapes.some((sh) => inWindow(sh, f)))
+        : null;
+    play = playButton(focused ? 'Play this position' : 'Play scale', () => {
+      const run = focused ?? scaleMidis(pc(st.root), semis);
+      playSequence([...run, ...[...run].reverse().slice(1)], 0.22);
+    });
+  } else if (st.fretMode === 'chord') {
+    const grip = chosen ?? (focusShapes[0] ? { frets: focusShapes[0].frets } : library[0]);
+    play = playButton('Strum', () =>
+      playChord(grip ? grip.frets.flatMap((f, i) => (f === null ? [] : [opens[i] + f])) : chordMidis(pc(st.root), semis)),
+    );
+  } else if (st.fretMode === 'triads') {
+    play = playButton('Play every inversion', () =>
+      playProgression(voicings.map((v) => v.strings.map((str, i) => opens[str] + v.frets[i])), 0.7),
+    );
+  }
+
   root.replaceChildren(
     controls(st, tn, error, r),
     h('div', { class: 'neck-scroll', tabindex: '0', 'aria-label': 'Fretboard, scroll horizontally' }, svg),
-    info(st, r, tn, voicings, cagedActive, shapes),
+    h('p', { class: 'hint' }, st.fretMode === 'triads' ? 'Select any note to hear it, or a connecting line to strum that triad.' : 'Select any note to hear it.'),
+    ...(st.fretMode === 'chord' ? [voicingLibrary(r, tn, library, chosen, opens)] : []),
+    info(st, r, tn, voicings, cagedActive, shapes, nps, play),
   );
+}
+
+/** Pattern actually in effect: falls back to none when the selection can't use it. */
+function effectivePattern(st: State, tn: Tuning, r: Resolved): Pattern {
+  if (st.fretMode !== 'scale' && st.fretMode !== 'chord') return 'none';
+  if (st.pattern === 'caged') return isStandard(tn) && r.cagedQuality ? 'caged' : 'none';
+  if (st.pattern === '3nps') return st.fretMode === 'scale' && r.notes.length === 7 ? '3nps' : 'none';
+  return 'none';
+}
+
+/** Pitches of all marked notes inside a fret window, low to high, without repeats. */
+function positionsIn(tn: Tuning, r: Resolved, opens: number[], frets: number, inside: (f: number) => boolean): number[] {
+  const out = new Set<number>();
+  tn.strings.forEach((_, str) => {
+    for (let f = 0; f <= frets; f++) if (inside(f) && r.marks.has(fretPc(tn, str, f))) out.add(opens[str] + f);
+  });
+  return [...out].sort((a, b) => a - b);
+}
+
+function voicingLibrary(r: Resolved, tn: Tuning, library: Voicing[], chosen: Voicing | undefined, opens: number[]): HTMLElement {
+  if (!library.length) {
+    return h('section', { class: 'voicings' }, h('h3', {}, 'Voicings'), h('p', { class: 'hint' }, 'No playable root-position shapes in this tuning. Try another tuning or a simpler chord.'));
+  }
+  return h(
+    'section',
+    { class: 'voicings' },
+    h('div', { class: 'h3-row' },
+      h('h3', {}, `Voicings (${library.length})`),
+      chosen ? h('button', { type: 'button', class: 'chip', onclick: () => setState({ voicing: null }) }, 'Show all chord tones') : null),
+    h('p', { class: 'hint' }, 'Playable shapes with the root in the bass. Select one to see it on the neck and hear it.'),
+    h(
+      'ol',
+      { class: 'voicing-grid' },
+      ...library.map((v) => {
+        const name = voicingName(v);
+        const on = chosen && voicingName(chosen) === name;
+        return h(
+          'li',
+          {},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: on ? 'on' : '',
+              'aria-pressed': String(!!on),
+              'aria-label': `${name}${v.omitsFifth ? ', no 5th' : ''}`,
+              onclick: () => {
+                playChord(v.frets.flatMap((f, i) => (f === null ? [] : [opens[i] + f])));
+                setState({ voicing: name, pattern: 'none' });
+              },
+            },
+            chordDiagram(v, r.intervals, tn.strings.length),
+            h('span', { class: 'tab' }, name),
+            v.omitsFifth ? h('small', {}, 'no 5th') : null,
+          ),
+        );
+      }),
+    ),
+  );
+}
+
+export interface NeckMark {
+  string: number;
+  fret: number;
+  cls: string;
+  label?: string;
+}
+
+/** A plain neck with arbitrary marks, used by the practice quizzes. */
+export function neckSvg(tn: Tuning, frets: number, marks: NeckMark[]): SVGElement {
+  const g = geometry(tn.strings.length, frets);
+  const svg = s('svg', { viewBox: `0 0 ${g.width} ${g.height}`, width: g.width, height: g.height, class: 'fretboard', role: 'img', 'aria-label': 'Fretboard' });
+  svg.append(drawBoard(g, tn, frets));
+  for (const m of marks) {
+    svg.append(
+      s('g', { class: `dot ${m.cls}`, transform: `translate(${g.cx(m.fret)} ${g.y(m.string)})` },
+        s('circle', { r: 13 }),
+        m.label ? s('text', { y: 4.5 }, m.label) : null),
+    );
+  }
+  return svg;
 }

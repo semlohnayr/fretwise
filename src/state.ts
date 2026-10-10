@@ -1,6 +1,8 @@
 import { type Note, n, noteName, SCALES, CHORDS } from './theory';
 
-export type View = 'circle' | 'fretboard' | 'modes';
+export type View = 'circle' | 'fretboard' | 'modes' | 'capo' | 'practice';
+export type Pattern = 'none' | 'caged' | '3nps';
+export type QuizKind = 'note' | 'fret-interval' | 'ear-interval' | 'ear-chord';
 export type FretMode = 'scale' | 'chord' | 'triads' | 'notes';
 export type LabelMode = 'names' | 'intervals' | 'none';
 
@@ -17,8 +19,21 @@ export interface State {
   tuningId: string;
   customTuning: string;
   frets: number;
-  /** 'all' = show every CAGED shape, 'off' = disabled, or one shape. */
-  caged: 'off' | 'all' | 'C' | 'A' | 'G' | 'E' | 'D';
+  /** Scale/chord pattern overlay on the fretboard. */
+  pattern: Pattern;
+  /** Which CAGED shape to focus: every shape, or one. */
+  caged: 'all' | 'C' | 'A' | 'G' | 'E' | 'D';
+  /** Three-notes-per-string position, 1–7. */
+  npsPosition: number;
+  /** Selected chord voicing, identified by its tab name (e.g. "x32010"). */
+  voicing: string | null;
+  /* Capo calculator */
+  capoTarget: Note;
+  capoQuality: 'major' | 'minor';
+  capoShape: string;
+  capoFret: number;
+  /* Practice */
+  quiz: QuizKind;
   /** Triad string set, as index of the lowest string. */
   triadSet: number;
   modesView: 'parallel' | 'relative';
@@ -35,7 +50,15 @@ const initial: State = {
   tuningId: 'standard',
   customTuning: 'E A D G B E',
   frets: 15,
-  caged: 'off',
+  pattern: 'none',
+  caged: 'all',
+  npsPosition: 1,
+  voicing: null,
+  capoTarget: n('A'),
+  capoQuality: 'major',
+  capoShape: 'G',
+  capoFret: 2,
+  quiz: 'note',
   triadSet: 3,
   modesView: 'parallel',
 };
@@ -73,7 +96,7 @@ export function fromHash(): Partial<State> {
   const [view, query = ''] = location.hash.replace(/^#/, '').split('?');
   const p = new URLSearchParams(query);
   const out: Partial<State> = {};
-  if (view === 'circle' || view === 'fretboard' || view === 'modes') out.view = view;
+  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'capo' || view === 'practice') out.view = view;
   try {
     if (p.get('root')) out.root = n(p.get('root')!);
   } catch {

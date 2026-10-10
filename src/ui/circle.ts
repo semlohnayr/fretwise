@@ -4,7 +4,9 @@ import {
 } from '../theory';
 import { getState, setState, type State } from '../state';
 import { h, s, clickable } from './dom';
-import { noteRow } from './controls';
+import { noteRow, playButton } from './controls';
+import { playChord, playProgression, playSequence, chordMidis, scaleMidis } from '../audio';
+import type { DiatonicChord } from '../theory';
 
 let showSevenths = false;
 
@@ -133,7 +135,13 @@ function keyPanel(st: State): HTMLElement {
       h('button', { type: 'button', class: 'chip strong', onclick: () => setState({ view: 'fretboard', fretMode: 'scale', scaleId: isMajor ? 'ionian' : 'aeolian' }) }, 'Show scale on fretboard'),
     ),
 
-    h('h3', {}, 'Scale'),
+    h('div', { class: 'h3-row' },
+      h('h3', {}, 'Scale'),
+      playButton('Play scale', () => {
+        const run = scaleMidis(pc(st.root), scale.formula.map((i) => i.semitones));
+        playSequence([...run, ...[...run].reverse().slice(1)], 0.24);
+      }),
+    ),
     noteRow(notes, scale.formula),
 
     h(
@@ -158,10 +166,11 @@ function keyPanel(st: State): HTMLElement {
             h('b', {}, c.symbol),
             h('small', {}, c.notes.map((x) => noteName(x)).join(' ')),
           ),
+          playButton('', () => playChord(midisOf(c)), 'mini'),
         ),
       ),
     ),
-    h('p', { class: 'hint' }, 'Select a chord to see it on the fretboard.'),
+    h('p', { class: 'hint' }, 'Select a chord to see it on the fretboard, or its play button to hear it.'),
 
     h('h3', {}, 'Common progressions'),
     h(
@@ -172,7 +181,10 @@ function keyPanel(st: State): HTMLElement {
         return h(
           'li',
           {},
-          h('div', { class: 'prog-head' }, h('b', {}, p.name), h('span', { class: 'prog-romans' }, pcs.map((c) => c.roman).join(' – '))),
+          h('div', { class: 'prog-head' },
+            h('b', {}, p.name),
+            h('span', { class: 'prog-romans' }, pcs.map((c) => c.roman).join(' – ')),
+            playButton('Play', () => playProgression(pcs.map(midisOf)), 'small')),
           h(
             'div',
             { class: 'prog-chords' },
@@ -195,7 +207,7 @@ function explainer(): HTMLElement {
     sec(
       'Why fifths?',
       'Going clockwise, each key is a perfect fifth (seven frets) above the last: C, G, D, A and so on. After twelve steps you land back on C, having visited every note once.',
-      'Each step clockwise changes exactly one note of the scale. G major is C major with F raised to F♯; D major then also raises C to C♯. That is why neighbouring keys sound closely related and why modulating to a neighbour is so smooth.',
+      'Each step clockwise changes exactly one note of the scale. G major is C major with F raised to F♯; D major then also raises C to C♯. That is why neighboring keys sound closely related and why modulating to a neighbor is so smooth.',
       'Counter-clockwise the steps are fourths, and each one adds a flat instead: C, F (B♭), B♭ (B♭ E♭), and on around.',
     ),
     sec(
@@ -211,7 +223,7 @@ function explainer(): HTMLElement {
     sec(
       'Finding the chords of a key',
       'The highlighted wedge holds all seven chords of the selected key. The key sits in the middle with its IV to the left and its V to the right; the three minor chords ii, vi and iii sit beneath them, and vii° is in the innermost ring.',
-      'That is why I–IV–V songs feel so natural: the three chords are next-door neighbours. A ii–V–I moves counter-clockwise one step at a time, each chord resolving down a fifth to the next.',
+      'That is why I–IV–V songs feel so natural: the three chords are next-door neighbors. A ii–V–I moves counter-clockwise one step at a time, each chord resolving down a fifth to the next.',
     ),
     sec(
       'Enharmonic keys at the bottom',
@@ -235,4 +247,9 @@ export function renderCircle(root: HTMLElement, st: State = getState()): void {
     ),
     explainer(),
   );
+}
+
+/** Close-position pitches for a diatonic chord, root between C3 and B3. */
+function midisOf(c: DiatonicChord): number[] {
+  return chordMidis(pc(c.root), c.chord ? c.chord.formula.map((i) => i.semitones) : [0, 4, 7]);
 }

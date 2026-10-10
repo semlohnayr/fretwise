@@ -154,3 +154,73 @@ export function triadVoicings(tn: Tuning, triadPcs: number[], stringSet: number[
   }
   return out.sort((x, y) => Math.min(...x.frets) - Math.min(...y.frets));
 }
+
+/* ---------------- Absolute pitch ---------------- */
+
+/**
+ * MIDI pitch of each open string. The lowest string is placed between B1 and
+ * B♭2 (covers standard, drop and 7-string tunings); every higher string is
+ * the nearest pitch above the one below it. Re-entrant tunings are not modelled.
+ */
+export function stringMidis(tn: Tuning): number[] {
+  const out: number[] = [];
+  tn.strings.forEach((s, i) => {
+    const p = pc(s);
+    if (i === 0) {
+      let m = 36 + p; // C2 + pitch class
+      if (m < 35) m += 12;
+      if (m > 46) m -= 12;
+      out.push(m);
+    } else {
+      const prev = out[i - 1];
+      let m = prev - mod(prev, 12) + p;
+      while (m <= prev) m += 12;
+      out.push(m);
+    }
+  });
+  return out;
+}
+
+export const fretMidi = (tn: Tuning, string: number, fret: number): number => stringMidis(tn)[string] + fret;
+
+/* ---------------- Three notes per string ---------------- */
+
+export interface NpsPosition {
+  /** 1-based: position n starts on scale degree n on the lowest string. */
+  number: number;
+  /** Frets for each string, low → high (three per string). */
+  frets: number[][];
+  minFret: number;
+  maxFret: number;
+}
+
+/**
+ * Three-notes-per-string patterns for a seven-note scale. Position n starts
+ * on scale degree n on the lowest string and climbs the scale, three notes
+ * per string. Works in any tuning whose strings ascend.
+ */
+export function threeNps(tn: Tuning, rootPc: number, scaleSemis: number[], maxFret: number): NpsPosition[] {
+  if (scaleSemis.length !== 7) return [];
+  const opens = stringMidis(tn);
+  const out: NpsPosition[] = [];
+  for (let deg = 0; deg < 7; deg++) {
+    // Lowest fret on the bottom string that sounds scale degree `deg`.
+    const startFret = mod(rootPc + scaleSemis[deg] - pc(tn.strings[0]), 12);
+    for (let base = startFret; base <= maxFret; base += 12) {
+      // Build the ascending run of scale pitches from that note.
+      const pitches: number[] = [];
+      for (let k = 0; k < tn.strings.length * 3; k++) {
+        const step = deg + k;
+        pitches.push(opens[0] + base + scaleSemis[step % 7] + 12 * Math.floor(step / 7) - scaleSemis[deg]);
+      }
+      const frets = tn.strings.map((_, s) => pitches.slice(s * 3, s * 3 + 3).map((p) => p - opens[s]));
+      const flat = frets.flat();
+      const lo = Math.min(...flat);
+      const hi = Math.max(...flat);
+      if (lo < 0 || hi > maxFret) continue;
+      out.push({ number: deg + 1, frets, minFret: lo, maxFret: hi });
+      break; // one instance per position keeps the menu simple
+    }
+  }
+  return out;
+}

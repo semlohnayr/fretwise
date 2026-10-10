@@ -3,11 +3,16 @@ import { noteName } from './theory';
 import { renderCircle } from './ui/circle';
 import { renderFretboard } from './ui/fretboard';
 import { renderModes } from './ui/modes';
+import { renderCapo } from './ui/capo';
+import { renderPractice } from './ui/practice';
+import { isMuted, setMuted, onMuteChange, audioSupported } from './audio';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'circle', label: 'Circle of fifths' },
   { id: 'fretboard', label: 'Fretboard' },
   { id: 'modes', label: 'Modes' },
+  { id: 'capo', label: 'Capo' },
+  { id: 'practice', label: 'Practice' },
 ];
 
 const nav = document.querySelector<HTMLElement>('#views')!;
@@ -30,6 +35,7 @@ function render(st: State): void {
       return a;
     }),
   );
+  context.parentElement!.hidden = st.view === 'capo' || st.view === 'practice';
   context.textContent = `${noteName(st.root)}${st.keyQuality === 'minor' && st.view === 'circle' ? ' minor' : ''}`;
 
   // Keep focus and scroll stable when re-rendering the same view.
@@ -39,7 +45,9 @@ function render(st: State): void {
 
   if (st.view === 'circle') renderCircle(main, st);
   else if (st.view === 'fretboard') renderFretboard(main, st);
-  else renderModes(main, st);
+  else if (st.view === 'modes') renderModes(main, st);
+  else if (st.view === 'capo') renderCapo(main, st);
+  else renderPractice(main, st);
 
   if (lastView !== st.view) {
     window.scrollTo({ top: 0 });
@@ -56,6 +64,20 @@ function render(st: State): void {
   }
   lastView = st.view;
 }
+
+// Sound toggle in the header.
+const sound = document.querySelector<HTMLButtonElement>('#sound')!;
+const paintSound = (m: boolean) => {
+  sound.setAttribute('aria-pressed', String(!m));
+  sound.querySelector('span')!.textContent = m ? 'Sound off' : 'Sound on';
+};
+if (!audioSupported()) sound.hidden = true;
+paintSound(isMuted());
+sound.addEventListener('click', () => setMuted(!isMuted()));
+onMuteChange((m) => {
+  paintSound(m);
+  render(getState());
+});
 
 subscribe(render);
 // Pasted or edited links (and back/forward) update the app without a reload.

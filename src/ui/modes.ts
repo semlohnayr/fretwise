@@ -1,10 +1,11 @@
 import {
   type Interval, type ModeInfo, MODES, modeById, scaleById, scaleNotes, parentMajor, harmonize,
-  noteName, intervalLabel, relativeMinor,
+  noteName, intervalLabel, relativeMinor, pc,
 } from '../theory';
 import { getState, setState, type State } from '../state';
 import { h, segmented } from './dom';
-import { degreeClass, noteRow, rootPicker } from './controls';
+import { degreeClass, noteRow, rootPicker, playButton } from './controls';
+import { playScaleWithDrone, scaleMidis } from '../audio';
 
 let order: 'degree' | 'brightness' = 'brightness';
 
@@ -85,21 +86,23 @@ function detail(st: State, mode: ModeInfo): HTMLElement {
   const notes = scaleNotes(st.root, scale);
   const parent = parentMajor(st.root, mode.id);
   const chords = harmonize(st.root, scale);
-  const neighbour = mode.brightness > 1 ? MODES.find((m) => m.brightness === mode.brightness - 1) : undefined;
+  const neighbor = mode.brightness > 1 ? MODES.find((m) => m.brightness === mode.brightness - 1) : undefined;
   return h(
     'article',
     { class: 'mode-detail' },
-    h('h2', {}, `${noteName(st.root)} ${mode.name}`),
+    h('div', { class: 'title-row' },
+      h('h2', {}, `${noteName(st.root)} ${mode.name}`),
+      playButton('Play over a drone', () => playScaleWithDrone(scaleMidis(pc(st.root), scale.formula.map((i) => i.semitones)), 0.34))),
     noteRow(notes, scale.formula),
     h(
       'div',
       { class: 'prose' },
       h('p', {}, mode.feel),
       h('p', {}, `Characteristic note: the ${mode.characteristic}. ${mode.quality === 'major' ? 'Compared with plain major' : mode.quality === 'minor' ? 'Compared with natural minor' : 'Compared with Phrygian'}, this is the note to lean on so the mode is heard.`),
-      neighbour ? h('p', {}, `One step brighter is ${neighbour.name}: raise one note of ${mode.name} by a half step and you get there.`) : h('p', {}, 'Nothing is brighter than Lydian: every note sits as high as it can while keeping a perfect 5th.'),
+      neighbor ? h('p', {}, `One step brighter is ${neighbor.name}: raise one note of ${mode.name} by a half step and you get there.`) : h('p', {}, 'Nothing is brighter than Lydian: every note sits as high as it can while keeping a perfect 5th.'),
       h('p', {}, h('b', {}, 'Harmony. '), mode.harmony),
       h('p', {}, h('b', {}, 'Where you hear it. '), mode.examples),
-      h('p', {}, `Same notes as ${noteName(parent)} major (and ${noteName(relativeMinor(parent))} minor), but centred on ${noteName(st.root)}.`),
+      h('p', {}, `Same notes as ${noteName(parent)} major (and ${noteName(relativeMinor(parent))} minor), but centered on ${noteName(st.root)}.`),
     ),
     h('h3', {}, 'Chords of the mode'),
     h(
@@ -128,7 +131,7 @@ function explainer(): HTMLElement {
     h('h2', {}, 'Understanding modes'),
     sec(
       'What a mode is',
-      'A mode is a scale heard from a different home note. Play C major from D to D and every note is the same, but the sound centres on D and becomes D Dorian.',
+      'A mode is a scale heard from a different home note. Play C major from D to D and every note is the same, but the sound centers on D and becomes D Dorian.',
       'What changes is the set of intervals above the root. That pattern of whole and half steps is what gives each mode its character.',
     ),
     sec(

@@ -43,3 +43,12 @@ export function noteRow(notes: Note[], intervals: Interval[]): HTMLElement {
     ),
   );
 }
+
+/** A button that plays something; shows a speaker-style triangle before the label. */
+export function playButton(label: string, onPlay: () => void, extraClass = ''): HTMLButtonElement {
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 12 12');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = '<path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/>';
+  return h('button', { type: 'button', class: `play ${extraClass}`, onclick: onPlay }, icon, label);
+}
