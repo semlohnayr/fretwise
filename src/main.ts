@@ -5,6 +5,8 @@ import { renderFretboard } from './ui/fretboard';
 import { renderModes } from './ui/modes';
 import { renderCapo } from './ui/capo';
 import { renderMelody } from './ui/melody';
+import { renderSessions } from './ui/sessions';
+import { initSessionBar } from './ui/sessionbar';
 import { renderPractice } from './ui/practice';
 import { isMuted, setMuted, onMuteChange, audioSupported } from './audio';
 import { initMetronome } from './ui/metronome';
@@ -17,6 +19,7 @@ const VIEWS: { id: View; label: string }[] = [
   { id: 'melody', label: 'Melody' },
   { id: 'capo', label: 'Capo' },
   { id: 'practice', label: 'Practice' },
+  { id: 'sessions', label: 'Sessions' },
 ];
 
 const nav = document.querySelector<HTMLElement>('#views')!;
@@ -39,7 +42,7 @@ function render(st: State): void {
       return a;
     }),
   );
-  context.parentElement!.hidden = st.view === 'capo' || st.view === 'practice' || st.view === 'melody';
+  context.parentElement!.hidden = st.view === 'capo' || st.view === 'practice' || st.view === 'melody' || st.view === 'sessions';
   context.textContent = `${noteName(st.root)}${st.keyQuality === 'minor' && st.view === 'circle' ? ' minor' : ''}`;
 
   // Keep focus and scroll stable when re-rendering the same view.
@@ -54,6 +57,7 @@ function render(st: State): void {
   else if (st.view === 'modes') renderModes(main, st);
   else if (st.view === 'melody') renderMelody(main, st);
   else if (st.view === 'capo') renderCapo(main, st);
+  else if (st.view === 'sessions') renderSessions(main, st);
   else renderPractice(main, st);
 
   if (lastView !== st.view) {
@@ -87,6 +91,7 @@ onMuteChange((m) => {
 });
 
 initMetronome();
+initSessionBar();
 subscribe(render);
 // Pasted or edited links (and back/forward) update the app without a reload.
 window.addEventListener('hashchange', () => setState(fromHash()));

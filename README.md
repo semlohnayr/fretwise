@@ -47,6 +47,14 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - Playback runs through the metronome, so the count-in, click and speed trainer all apply, with an optional boom-chuck backing from the tune's chords.
 - Grade my playing: play the phrase into your microphone after a count-in and get each note marked right, wrong octave, wrong note or not heard, with your average timing (rushing or dragging). A one-time calibration measures your microphone's delay. Grading listens for each pick attack and the new pitch at that moment, so strings ringing over each other do not throw it off.
 
+**Sessions**
+- Five practice plans (Quick 15, Balanced 30, Speed builder, Learn a tune, Know the neck), each a list of timed steps with a short how-to.
+- Start a plan and a bar under the header counts down each step, plays a soft chime when its time is up, and takes you straight to the exercise. Pause, skip ahead or end at any time; adjust step lengths before you start.
+- A practice log in your browser tracks minutes per day, the last seven days and your streak.
+- Practice tips: warming up, accuracy before speed, staying relaxed, short loops, ending with music.
+
+**Warm-ups** (on the Melody page): open-string picking, string crossing, two spider drills (1-2-3-4 and 1-3-2-4) on any fret, hammer-on and pull-off trills, a three-notes-per-string G major scale and G pentatonic in threes. Fingering is fixed, the neck shows which finger plays each fret, and everything works with the speed trainer and grading.
+
 **Capo**
 - Pick the key you need to sound in and see which open-chord keys (G, C, D, A, E; Em, Am, Dm) get you there and on which fret.
 - Translate any shape key and capo position chord by chord into the sounding key, with playback at concert pitch.
@@ -115,12 +123,16 @@ src/
     melody.ts      Melody page
     tab.ts         Tab renderer
     highlight.ts   Marks the note that is sounding
+    sessions.ts    Sessions page
+    sessionbar.ts  Session timer bar
     controls.ts    Shared pickers and note chips
     dom.ts         Tiny element helpers
   audio.ts         Plucked-string synth and metronome click (Web Audio)
   metronome.ts     Look-ahead scheduler: click, speed trainer, play-along tracks
   mic.ts           Microphone input for grading
-  content/         Tunes and licks (ABC)
+  content/         Tunes and licks (ABC), warm-ups and practice plans
+  session.ts       Practice-session runner (timer, steps, log)
+  sessionlog.ts    Practice log statistics
   state.ts         Shared app state and URL hash sync
   main.ts          Navigation and rendering
   styles.css
@@ -129,6 +141,7 @@ tests/
   features.test.ts String pitches, 3NPS, voicings, capo, quizzes, synth tuning
   tempo.test.ts    Tempo ramp, tap tempo, click accents
   melody.test.ts   ABC parsing, bundled tunes, fingering, picking, melodies, backing, grading
+  sessions.test.ts Practice log, plans and warm-ups
 ```
 
 The theory engine has no DOM dependencies, so it can be reused elsewhere (a CLI, a different UI) or extended with tests first.

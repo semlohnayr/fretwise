@@ -5,7 +5,7 @@
  * from the microphone.
  */
 import {
-  type Note, type Tuning, type TimedNote, type Timeline, type Stroke, type ChordSpan, type GradeSummary,
+  type Note, type Tuning, type TimedNote, type Timeline, type Stroke, type ChordSpan, type GradeSummary, type TabPos,
   n, pc, noteName, spellPc, between, transpose, intervalLabel, scaleById, scaleNotes, harmonize, chordNotes,
   parseAbc, expandRepeats, splitParts, timeline, autoTab, alternatePicks, economyPicks, patternPicks,
   randomMelody, seeded, parseChordSymbol, chordSpans, progressionSpans, boomChuck, analyzeRecording, gradeOnsets, median,
@@ -22,6 +22,7 @@ import { tabSvg, type TabNote } from './tab';
 import { markNow } from './highlight';
 import { TUNES, type TuneEntry } from '../content/tunes';
 import { LICKS } from '../content/licks';
+import { WARMUPS, warmupById } from '../content/warmups';
 
 /* ---------- Page settings (kept for the session; not part of the URL) ---------- */
 
@@ -37,6 +38,7 @@ const ms = {
   countIn: true,
   loop: true,
   lickKey: n('G'),
+  warmFret: 1,
   rnd: { key: n('G'), scaleId: 'major-pentatonic', bars: 4, rhythm: 'mixed' as 'quarters' | 'eighths' | 'mixed', seed: 1 },
   ch: { key: n('G'), prog: 'three', barsEach: 1, show: 'tones' as 'tones' | 'thirds', sevenths: false },
 };
@@ -83,6 +85,10 @@ interface Exercise {
   spans: ChordSpan[];
   capo: number;
   picks?: string;
+  /** Fixed fingering (warm-ups), instead of working it out. */
+  fixedPos?: TabPos[];
+  /** Label the neck with fretting-hand fingers, counting from this fret as finger 1. */
+  fingerFrom?: number;
 }
 
 function tuneExercise(st: State): { ex: Exercise; tune: TuneEntry; parts: number; phrases: number } | null {
@@ -399,16 +405,76 @@ function pickControls(ex: Exercise): HTMLElement {
   const value = ms.pick === 'pattern' && !ex.picks ? 'alternate' : ms.pick;
   return h('div', { class: 'control-row' },
     segmented('Picking', value, opts, (v) => { ms.pick = v; rerender(); }),
-    segmented('Fingering', ms.fingering, [
+    ex.fixedPos ? null : segmented('Fingering', ms.fingering, [
       { value: 'open', label: 'Open position' },
       { value: 'pos5', label: 'Up the neck (5th)' },
       { value: 'pos7', label: '7th position' },
     ], (v) => { ms.fingering = v; rerender(); }));
 }
 
+/* ---------- Warm-ups ---------- */
+
+function warmupExercise(st: State, tn: Tuning): Exercise {
+  const w = warmupById(st.warmupId);
+  const opens = stringMidis(tn);
+  const cells = w.cells(w.movable ? ms.warmFret : 0).filter((c) => tn.strings.length - c.string >= 0);
+  let t = 0;
+  const fixedPos: TabPos[] = [];
+  const notes: TimedNote[] = cells.map((c) => {
+    const s = tn.strings.length - c.string;
+    const midi = opens[s] + c.fret;
+    fixedPos.push({ string: s, fret: c.fret });
+    const dur = c.dur ?? 0.5;
+    const note: TimedNote = { midi, dur, spelled: spellPc(midi), onset: t, bar: Math.floor(t / 4), legato: c.legato };
+    t += dur;
+    return note;
+  });
+  const g = w.id === 'g-3nps' || w.id === 'pent-threes';
+  return {
+    id: `warmup:${w.id}:${w.movable ? ms.warmFret : 0}`,
+    title: w.name,
+    keyRoot: g ? n('G') : n('C'),
+    keyLabel: g ? 'G major' : w.movable ? `Starting at fret ${ms.warmFret}` : 'Open strings',
+    tl: { notes, offset: 0, length: Math.max(4, Math.ceil(t / 4 - 1e-9) * 4), beatsPerBar: 4, chords: [] },
+    firstBar: 1,
+    spans: [],
+    capo: 0,
+    fixedPos,
+    fingerFrom: w.movable ? ms.warmFret : undefined,
+  };
+}
+
+function warmupsTab(st: State, tn: Tuning): (HTMLElement | null)[] {
+  const w = warmupById(st.warmupId);
+  const ex = warmupExercise(st, tn);
+  return [
+    h('div', { class: 'controls' },
+      h('div', { class: 'control-row' },
+        select('Warm-up', w.id, WARMUPS.map((x) => ({ value: x.id, label: x.name })), (warmupId) => { lastResult = null; setState({ warmupId }); }),
+        w.movable
+          ? segmented('Start at fret', String(ms.warmFret), ['1', '3', '5', '7', '9'].map((f) => ({ value: f, label: f })), (v) => { ms.warmFret = Number(v); rerender(); })
+          : null)),
+    ...exerciseView(ex, tn, [
+      h('p', { class: 'prose' }, w.how),
+      h('p', { class: 'meta' }, `Suggested start: ${w.startBpm} BPM, eighth notes. Raise it by 4–5 BPM only after three clean passes in a row, or let the speed trainer do it.`),
+    ]),
+  ];
+}
+
+/** Lets a practice-session step jump straight to a part, phrase or starting fret. */
+export function focusMelody(opts: { part?: number; phrase?: number; warmFret?: number; pick?: 'alternate' | 'economy' | 'pattern'; changesKey?: string; changesProg?: string }): void {
+  if (opts.changesKey) ms.ch.key = n(opts.changesKey);
+  if (opts.changesProg) ms.ch.prog = opts.changesProg;
+  if (opts.part !== undefined) ms.part = opts.part;
+  if (opts.phrase !== undefined) ms.phrase = opts.phrase;
+  if (opts.warmFret !== undefined) ms.warmFret = opts.warmFret;
+  if (opts.pick !== undefined) ms.pick = opts.pick;
+  lastResult = null;
+}
+
 function exerciseView(ex: Exercise, tn: Tuning, extraInfo: (HTMLElement | null)[]): (HTMLElement | null)[] {
   const style = tabStyle();
-  const pos = autoTab(tn, ex.tl.notes.map((x) => x.midi), { ...style, capo: ex.capo, maxFret: 17 });
+  const pos = ex.fixedPos ?? autoTab(tn, ex.tl.notes.map((x) => x.midi), { ...style, capo: ex.capo, maxFret: 17 });
   const picks = picksFor(ex, pos);
   const result = lastResult && lastResult.exId === ex.id ? lastResult.summary : null;
   // Map graded notes (in order of pitched notes) back onto note indices.
@@ -443,6 +509,11 @@ function exerciseView(ex: Exercise, tn: Tuning, extraInfo: (HTMLElement | null)[
     const key = `${p.string}:${p.fret + ex.capo}`;
     if (seen.has(key)) return;
     const spelled = x.spelled ?? spellPc(x.midi);
+    if (ex.fingerFrom !== undefined && p.fret > 0) {
+      // Chromatic drills: show which finger plays each fret.
+      seen.set(key, { string: p.string, fret: p.fret, cls: 'finger', label: String(p.fret - ex.fingerFrom + 1) });
+      return;
+    }
     seen.set(key, { string: p.string, fret: p.fret + ex.capo, cls: degreeClass(between(ex.keyRoot, spelled)), label: noteName(spelled) });
   });
   const maxFret = Math.max(5, ...[...seen.values()].map((m) => m.fret)) + 2;
@@ -458,6 +529,7 @@ function exerciseView(ex: Exercise, tn: Tuning, extraInfo: (HTMLElement | null)[
     isMuted() ? h('p', { class: 'error' }, 'Sound is off. Turn it on with the Sound button at the top of the page.') : null,
     h('div', { class: 'tab-scroll' }, tabSvg(tabNotes, { stringNames: names, beatsPerBar: ex.tl.beatsPerBar, length: ex.tl.length, firstBar: ex.firstBar })),
     h('p', { class: 'hint' }, 'Pick strokes above the tab: ⊓ down, V up. h and p mark hammer-ons and pull-offs, which are not picked.', ex.capo ? ` Frets are counted from the capo.` : ''),
+    ex.fingerFrom !== undefined ? h('p', { class: 'hint' }, 'Numbers on the neck are fretting-hand fingers: 1 index, 2 middle, 3 ring, 4 little.') : null,
     h('div', { class: 'neck-scroll melody-neck' }, neckSvg(tn, Math.min(24, maxFret), [...seen.values()], ex.capo)),
     gradePanel(ex, absPos, result),
     ...extraInfo,
@@ -730,7 +802,8 @@ export function renderMelody(root: HTMLElement, st: State = getState()): void {
   const { tuning: tn } = getTuning(st);
   const tab = st.melodyTab;
   let body: (HTMLElement | null)[];
-  if (tab === 'licks') body = licksTab(st, tn);
+  if (tab === 'warmups') body = warmupsTab(st, tn);
+  else if (tab === 'licks') body = licksTab(st, tn);
   else if (tab === 'random') body = randomTab(tn);
   else if (tab === 'changes') body = changesTab(tn);
   else body = tunesTab(st, tn);
@@ -738,6 +811,7 @@ export function renderMelody(root: HTMLElement, st: State = getState()): void {
     h('div', { class: 'controls' },
       h('div', { class: 'control-row' },
         segmented('Practice', tab, [
+          { value: 'warmups', label: 'Warm-ups' },
           { value: 'tunes', label: 'Fiddle tunes' },
           { value: 'licks', label: 'Licks' },
           { value: 'random', label: 'Random melody' },
