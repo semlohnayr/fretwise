@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fretwise: guitar theory workbench</title>
+    <meta name="description" content="Interactive circle of fifths, fretboard (scales, chords, triads, CAGED, alternate tunings) and modes explorer for guitarists." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%233A2118'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23D9932B'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="top">
+      <div class="brand">
+        <svg viewBox="0 0 40 24" aria-hidden="true" class="brand-mark">
+          <rect x="0" y="2" width="40" height="20" rx="3" />
+          <line x1="12" y1="2" x2="12" y2="22" />
+          <line x1="24" y1="2" x2="24" y2="22" />
+          <line x1="35" y1="2" x2="35" y2="22" />
+          <circle cx="18" cy="12" r="3.4" />
+        </svg>
+        <span>Fretwise</span>
+      </div>
+      <nav id="views" aria-label="Views"></nav>
+      <p class="context" aria-live="polite">Root <b id="context"></b></p>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="foot">
+      <p>Notes are spelled for the key, so F♯ major has an E♯ and C°7 has a B𝄫.</p>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
