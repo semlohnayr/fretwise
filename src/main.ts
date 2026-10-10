@@ -6,6 +6,8 @@ import { renderModes } from './ui/modes';
 import { renderCapo } from './ui/capo';
 import { renderPractice } from './ui/practice';
 import { isMuted, setMuted, onMuteChange, audioSupported } from './audio';
+import { initMetronome } from './ui/metronome';
+import { setGuide } from './metronome';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'circle', label: 'Circle of fifths' },
@@ -43,6 +45,8 @@ function render(st: State): void {
   const scroller = main.querySelector('.neck-scroll');
   const neckScroll = scroller?.scrollLeft ?? 0;
 
+  // Only the fretboard supplies play-along notes.
+  if (st.view !== 'fretboard') setGuide(null);
   if (st.view === 'circle') renderCircle(main, st);
   else if (st.view === 'fretboard') renderFretboard(main, st);
   else if (st.view === 'modes') renderModes(main, st);
@@ -79,6 +83,7 @@ onMuteChange((m) => {
   render(getState());
 });
 
+initMetronome();
 subscribe(render);
 // Pasted or edited links (and back/forward) update the app without a reload.
 window.addEventListener('hashchange', () => setState(fromHash()));

@@ -9,6 +9,7 @@ import { getState, setState, type State, type FretMode, type Pattern } from '../
 import { h, s, select, segmented } from './dom';
 import { degreeClass, noteRow, rootPicker, playButton } from './controls';
 import { playNote, playChord, playSequence, playProgression, scaleMidis, chordMidis } from '../audio';
+import { setGuide, type GuideNote } from '../metronome';
 
 const TRIAD_IDS = ['maj', 'min', 'dim', 'aug', 'sus2', 'sus4'];
 const INLAYS = [3, 5, 7, 9, 15, 17, 19, 21];
@@ -153,7 +154,7 @@ function dot(g: Geo, string: number, fret: number, m: Marked, st: State, extra =
   const label = st.labels === 'names' ? noteName(m.note) : st.labels === 'intervals' ? intervalLabel(m.interval) : '';
   const el = s(
     'g',
-    { class: `dot ${degreeClass(m.interval)} ${m.interval.degree === 1 ? 'root' : ''} ${extra}`, transform: `translate(${g.cx(fret)} ${g.y(string)})` },
+    { class: `dot ${degreeClass(m.interval)} ${m.interval.degree === 1 ? 'root' : ''} ${extra}`, transform: `translate(${g.cx(fret)} ${g.y(string)})`, 'data-pos': `${string}:${fret}` },
     s('circle', { r: 13 }),
     label ? s('text', { y: 4.5, class: label.length > 2 ? 'small' : '' }, label) : null,
   );
@@ -430,6 +431,30 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     });
     svg.append(dots);
   }
+
+  // Play-along notes for the metronome: the highlighted scale position, low to high.
+  let guide: GuideNote[] | null = null;
+  let guideLabel = '';
+  if (st.fretMode === 'scale' && nps) {
+    guide = nps.frets.flatMap((fs, str) => fs.map((f) => ({ midi: opens[str] + f, pos: `${str}:${f}` })));
+    guideLabel = `${r.title}, position ${nps.number}`;
+  } else if (st.fretMode === 'scale' && focusShapes.length === 1) {
+    const sh = focusShapes[0];
+    const seen = new Set<number>();
+    const notes: GuideNote[] = [];
+    tn.strings.forEach((_, str) => {
+      for (let f = sh.window[0]; f <= sh.window[1]; f++) {
+        const midi = opens[str] + f;
+        if (r.marks.has(fretPc(tn, str, f)) && !seen.has(midi)) {
+          seen.add(midi);
+          notes.push({ midi, pos: `${str}:${f}` });
+        }
+      }
+    });
+    guide = notes.sort((a, b) => a.midi - b.midi);
+    guideLabel = `${r.title}, ${sh.name} shape`;
+  }
+  setGuide(guide, guideLabel);
 
   // What the play button plays depends on what is highlighted.
   const semis = r.intervals.map((i) => i.semitones);

@@ -116,6 +116,12 @@ function stringBuffer(ac: AudioContext, midi: number): AudioBuffer {
 
 /** Play one note `delay` seconds from now. */
 export function playNote(midi: number, delay = 0, gain = 0.8): void {
+  const ac = context();
+  if (ac) playNoteAt(midi, ac.currentTime + 0.02 + delay, gain);
+}
+
+/** Play one note at an absolute AudioContext time (used by the metronome's scheduler). */
+export function playNoteAt(midi: number, when: number, gain = 0.8): void {
   if (muted) return;
   const ac = context();
   if (!ac || !master) return;
@@ -124,10 +130,31 @@ export function playNote(midi: number, delay = 0, gain = 0.8): void {
   const g = ac.createGain();
   g.gain.value = gain;
   src.connect(g).connect(master);
-  src.start(ac.currentTime + 0.02 + delay);
+  src.start(when);
   active.add(src);
   src.onended = () => active.delete(src);
 }
+
+/** A short woodblock-style click at an absolute time. Level 2 = bar accent, 1 = beat, 0 = subdivision. */
+export function clickAt(when: number, level: 0 | 1 | 2): void {
+  if (muted) return;
+  const ac = context();
+  if (!ac || !master) return;
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = level === 2 ? 1760 : level === 1 ? 1175 : 880;
+  const peak = level === 2 ? 0.9 : level === 1 ? 0.6 : 0.28;
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(peak, when + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+  osc.connect(g).connect(master);
+  osc.start(when);
+  osc.stop(when + 0.06);
+}
+
+/** The shared AudioContext, created (and resumed) on demand. */
+export const audioContext = (): AudioContext | null => context();
 
 /** Strum notes low to high. */
 export function playChord(midis: number[], delay = 0, strum = 0.035): void {

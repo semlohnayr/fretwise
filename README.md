@@ -25,6 +25,13 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - A built-in plucked-string synth (Karplus–Strong, no samples). Select any note on the neck to hear it; play scales, positions, chords, triads, every chord in a key, progressions, and modes over a drone.
 - The Sound button in the header mutes everything and remembers your choice.
 
+**Metronome**
+- Opens from the header and stays docked at the bottom of every page, so it keeps time while you look at the neck.
+- 30–300 BPM, tap tempo, 2–7 beats per bar, quarter, eighth, triplet or sixteenth clicks, and an accented downbeat. Space starts and stops it.
+- Speed trainer: start at one tempo and climb a set number of BPM every few bars until you reach a target, then hold.
+- Play-along: pick a 3-per-string position or a single CAGED shape for a scale on the Fretboard page and the metronome plays it up and back down, one note per click, lighting each note on the neck as it sounds.
+- Clicks are scheduled ahead on the audio clock, so timing stays steady even when the page is busy.
+
 **Modes**
 - Parallel view: all seven modes on one root against a chromatic ruler, ordered brightest to darkest, so you can watch one note drop at a time.
 - Relative view: the seven modes of one parent major key.
@@ -82,21 +89,25 @@ src/
     voicings.ts    Playable chord voicing generator
     capo.ts        Capo calculator
     quiz.ts        Practice question generators (seedable)
+    tempo.ts       Tempo ramp, tap tempo and click-pattern helpers
   ui/              View rendering (plain DOM + SVG, no framework)
     circle.ts      Circle of fifths view
     fretboard.ts   Fretboard view
     modes.ts       Modes view
     capo.ts        Capo view
     practice.ts    Practice quizzes
+    metronome.ts   Metronome dock
     controls.ts    Shared pickers and note chips
     dom.ts         Tiny element helpers
-  audio.ts         Plucked-string synth (Web Audio)
+  audio.ts         Plucked-string synth and metronome click (Web Audio)
+  metronome.ts     Look-ahead metronome scheduler, speed trainer, play-along
   state.ts         Shared app state and URL hash sync
   main.ts          Navigation and rendering
   styles.css
 tests/
   theory.test.ts   Spelling, keys, harmonization, CAGED and triad tests
   features.test.ts String pitches, 3NPS, voicings, capo, quizzes, synth tuning
+  tempo.test.ts    Tempo ramp, tap tempo, click accents
 ```
 
 The theory engine has no DOM dependencies, so it can be reused elsewhere (a CLI, a different UI) or extended with tests first.
@@ -105,7 +116,7 @@ The theory engine has no DOM dependencies, so it can be reused elsewhere (a CLI,
 
 - Left-handed (mirrored) fretboard.
 - Inversions and drop voicings in the voicing library.
-- A metronome and tempo ramp for scale practice.
+- Melody practice: call-and-response ear training, melodic dictation and fiddle-tune phrases.
 
 ## License
 

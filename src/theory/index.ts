@@ -7,3 +7,4 @@ export * from './fretboard';
 export * from './voicings';
 export * from './capo';
 export * from './quiz';
+export * from './tempo';
