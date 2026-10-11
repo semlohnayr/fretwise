@@ -15,7 +15,8 @@ import { getState, setState, type State } from '../state';
 import * as metro from '../metronome';
 import * as mic from '../mic';
 import { playNoteAt, isMuted } from '../audio';
-import { h, segmented, select } from './dom';
+import { h, segmented, select, disclosure, pageTabs } from './dom';
+import { openSpeedTrainer } from './metronome';
 import { degreeClass, rootPicker } from './controls';
 import { getTuning, neckSvg, type NeckMark } from './fretboard';
 import { tabSvg, type TabNote } from './tab';
@@ -378,38 +379,56 @@ function playControls(ex: Exercise, absPos: (string | null)[]): HTMLElement {
       h('button', { type: 'button', class: 'step', 'aria-label': 'Slower', onclick: () => metro.update({ bpm: t.bpm - 5 }), disabled: t.rampOn }, '−'),
       h('output', { class: 'bpm' }, h('b', { id: 'melody-bpm' }, String(running ? metro.currentTempo() : t.rampOn ? t.ramp.from : t.bpm)), h('small', {}, 'BPM')),
       h('button', { type: 'button', class: 'step', 'aria-label': 'Faster', onclick: () => metro.update({ bpm: t.bpm + 5 }), disabled: t.rampOn }, '+')),
-    h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: ms.countIn, onchange: (e: Event) => { ms.countIn = (e.target as HTMLInputElement).checked; rerender(); } }), 'Count-in bar'),
-    h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: ms.loop, onchange: (e: Event) => { ms.loop = (e.target as HTMLInputElement).checked; rerender(); } }), 'Loop'),
-    ex.spans.length
-      ? h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: ms.backing, onchange: (e: Event) => { ms.backing = (e.target as HTMLInputElement).checked; rerender(); } }), 'Boom-chuck backing')
-      : null,
-    h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: t.click, onchange: (e: Event) => metro.update({ click: (e.target as HTMLInputElement).checked }) }), 'Click'),
     h('button', {
       type: 'button',
-      class: 'chip',
-      onclick: () => {
-        // The speed trainer lives in the metronome dock; open it.
-        const toggle = document.querySelector<HTMLButtonElement>('#metro-toggle');
-        if (toggle && toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
-      },
-    }, t.rampOn ? `Speed trainer: ${t.ramp.from} to ${t.ramp.to} BPM` : 'Speed trainer'),
+      class: 'chip mic',
+      disabled: gradingActive || !mic.micSupported(),
+      title: mic.micSupported() ? 'Play it into your microphone and get each note checked' : 'This browser does not allow microphone access here',
+      onclick: () => void startGrading(ex, absPos),
+    }, gradingActive ? 'Listening…' : 'Grade my playing'),
+    h('span', { id: 'mic-hearing', class: 'meta' }),
+    t.rampOn ? h('span', { class: 'meta' }, `Speed trainer: ${t.ramp.from} to ${t.ramp.to} BPM`) : null,
   );
 }
 
-function pickControls(ex: Exercise): HTMLElement {
-  const opts: { value: 'alternate' | 'economy' | 'pattern'; label: string }[] = [
+/** Everything about how it plays and how the tab is drawn, folded into one panel. */
+function optionsPanel(ex: Exercise): HTMLElement {
+  const t = metro.settings;
+  const pickOpts: { value: 'alternate' | 'economy' | 'pattern'; label: string }[] = [
     { value: 'alternate', label: 'Alternate' },
     { value: 'economy', label: 'Economy' },
   ];
-  if (ex.picks) opts.unshift({ value: 'pattern', label: 'As written' });
-  const value = ms.pick === 'pattern' && !ex.picks ? 'alternate' : ms.pick;
-  return h('div', { class: 'control-row' },
-    segmented('Picking', value, opts, (v) => { ms.pick = v; rerender(); }),
-    ex.fixedPos ? null : segmented('Fingering', ms.fingering, [
-      { value: 'open', label: 'Open position' },
-      { value: 'pos5', label: 'Up the neck (5th)' },
-      { value: 'pos7', label: '7th position' },
-    ], (v) => { ms.fingering = v; rerender(); }));
+  if (ex.picks) pickOpts.unshift({ value: 'pattern', label: 'As written' });
+  const pick = ms.pick === 'pattern' && !ex.picks ? 'alternate' : ms.pick;
+  const on = [ms.countIn && 'count-in', ms.loop && 'loop', ex.spans.length && ms.backing && 'backing', t.click && 'click'].filter(Boolean).join(', ');
+  const fingerName = { open: 'open position', pos5: '5th position', pos7: '7th position' }[ms.fingering];
+  const summary = [
+    on ? on[0].toUpperCase() + on.slice(1) : 'No count-in, loop, backing or click',
+    `${pick === 'pattern' ? 'written' : pick} picking`,
+    ex.fixedPos ? '' : fingerName,
+  ].filter(Boolean).join('; ');
+  const toggle = (label: string, checked: boolean, set: (v: boolean) => void) =>
+    h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked, onchange: (e: Event) => set((e.target as HTMLInputElement).checked) }), label);
+  return disclosure('melody-options', 'Options', summary, [
+    h('div', { class: 'control-row' },
+      toggle('Count-in bar', ms.countIn, (v) => { ms.countIn = v; rerender(); }),
+      toggle('Loop', ms.loop, (v) => { ms.loop = v; rerender(); }),
+      ex.spans.length ? toggle('Boom-chuck backing', ms.backing, (v) => { ms.backing = v; rerender(); }) : null,
+      toggle('Click', t.click, (v) => metro.update({ click: v })),
+      h('button', {
+        type: 'button',
+        class: 'chip',
+        // The speed trainer lives in the metronome dock.
+        onclick: () => openSpeedTrainer(),
+      }, 'Speed trainer…')),
+    h('div', { class: 'control-row' },
+      segmented('Picking', pick, pickOpts, (v) => { ms.pick = v; rerender(); }),
+      ex.fixedPos ? null : segmented('Fingering', ms.fingering, [
+        { value: 'open', label: 'Open position' },
+        { value: 'pos5', label: '5th position' },
+        { value: 'pos7', label: '7th position' },
+      ], (v) => { ms.fingering = v; rerender(); })),
+  ]);
 }
 
 /* ---------- Warm-ups ---------- */
@@ -454,10 +473,9 @@ function warmupsTab(st: State, tn: Tuning): (HTMLElement | null)[] {
         w.movable
           ? segmented('Start at fret', String(ms.warmFret), ['1', '3', '5', '7', '9'].map((f) => ({ value: f, label: f })), (v) => { ms.warmFret = Number(v); rerender(); })
           : null)),
-    ...exerciseView(ex, tn, [
-      h('p', { class: 'prose' }, w.how),
-      h('p', { class: 'meta' }, `Suggested start: ${w.startBpm} BPM, eighth notes. Raise it by 4–5 BPM only after three clean passes in a row, or let the speed trainer do it.`),
-    ]),
+    ...exerciseView(ex, tn,
+      h('p', { class: 'lead' }, w.how, ' ', h('span', { class: 'meta' }, `Start around ${w.startBpm} BPM; go up 4–5 BPM after three clean passes.`)),
+      []),
   ];
 }
 
@@ -472,7 +490,7 @@ export function focusMelody(opts: { part?: number; phrase?: number; warmFret?: n
   lastResult = null;
 }
 
-function exerciseView(ex: Exercise, tn: Tuning, extraInfo: (HTMLElement | null)[]): (HTMLElement | null)[] {
+function exerciseView(ex: Exercise, tn: Tuning, lead: HTMLElement | null, extraInfo: (HTMLElement | null)[]): (HTMLElement | null)[] {
   const style = tabStyle();
   const pos = ex.fixedPos ?? autoTab(tn, ex.tl.notes.map((x) => x.midi), { ...style, capo: ex.capo, maxFret: 17 });
   const picks = picksFor(ex, pos);
@@ -524,34 +542,44 @@ function exerciseView(ex: Exercise, tn: Tuning, extraInfo: (HTMLElement | null)[
       ex.capo ? h('span', { class: 'capo-tag' }, `Capo ${ex.capo}`) : null,
       h('span', { class: 'meta' }, ex.keyLabel),
     ),
+    lead,
     playControls(ex, absPos),
-    pickControls(ex),
+    optionsPanel(ex),
     isMuted() ? h('p', { class: 'error' }, 'Sound is off. Turn it on with the Sound button at the top of the page.') : null,
+    gradePanel(result),
     h('div', { class: 'tab-scroll' }, tabSvg(tabNotes, { stringNames: names, beatsPerBar: ex.tl.beatsPerBar, length: ex.tl.length, firstBar: ex.firstBar })),
-    h('p', { class: 'hint' }, 'Pick strokes above the tab: ⊓ down, V up. h and p mark hammer-ons and pull-offs, which are not picked.', ex.capo ? ` Frets are counted from the capo.` : ''),
-    ex.fingerFrom !== undefined ? h('p', { class: 'hint' }, 'Numbers on the neck are fretting-hand fingers: 1 index, 2 middle, 3 ring, 4 little.') : null,
+    h('p', { class: 'tab-key' },
+      h('span', {}, h('b', {}, '⊓'), ' down'), h('span', {}, h('b', {}, 'V'), ' up'), h('span', {}, h('b', {}, 'h'), ' hammer-on'), h('span', {}, h('b', {}, 'p'), ' pull-off'),
+      ex.capo ? h('span', {}, 'Frets counted from the capo') : null),
     h('div', { class: 'neck-scroll melody-neck' }, neckSvg(tn, Math.min(24, maxFret), [...seen.values()], ex.capo)),
-    gradePanel(ex, absPos, result),
+    ex.fingerFrom !== undefined ? h('p', { class: 'tab-key' }, 'Numbers are fretting-hand fingers: 1 index, 2 middle, 3 ring, 4 little.') : null,
     ...extraInfo,
+    gradingHelp(),
   ];
 }
 
-function gradePanel(ex: Exercise, absPos: (string | null)[], result: GradeSummary | null): HTMLElement {
-  const err = grading?.error && grading.exId === ex.id ? grading.error : '';
-  const hearing = h('span', { id: 'mic-hearing', class: 'meta' });
+/** Results, errors and calibration feedback; nothing at all until there is something to say. */
+function gradePanel(result: GradeSummary | null): HTMLElement | null {
+  const err = grading?.error ?? '';
+  if (!result && !err && !calibrationMsg) return null;
   return h(
     'section',
-    { class: 'grade' },
-    h('div', { class: 'title-row' },
-      h('h3', {}, 'Grade my playing'),
-      h('button', { type: 'button', class: 'play small', disabled: gradingActive || !mic.micSupported(), onclick: () => void startGrading(ex, absPos) }, gradingActive ? 'Listening…' : 'Start'),
-      h('button', { type: 'button', class: 'chip', disabled: gradingActive || !mic.micSupported(), onclick: () => void calibrate() }, 'Calibrate timing'),
-      hearing),
-    h('p', { class: 'prose' }, 'After a bar of clicks, play the phrase once into your microphone at the current tempo. Each note is checked for pitch and timing. The app stays silent apart from a quiet click, so the microphone hears only you; headphones help keep the click out too. It copes with strings ringing over each other, but damping each note gives the cleanest result. Calibrate once so timing is measured fairly.'),
+    { class: 'grade', 'aria-live': 'polite' },
     err ? h('p', { class: 'error' }, err) : null,
     calibrationMsg ? h('p', { class: 'meta' }, calibrationMsg) : null,
     result ? resultView(result) : null,
   );
+}
+
+function gradingHelp(): HTMLElement {
+  return disclosure('grading-help', 'About grading', '', [
+    h('div', { class: 'prose' },
+      h('p', {}, 'Grade my playing counts you in with a quiet click, then listens while you play the phrase once at the current tempo. Each note is checked for pitch and timing and marked in the tab.'),
+      h('p', {}, 'Headphones keep the click out of the microphone. Strings ringing over each other are fine, though damping each note gives the cleanest result.')),
+    h('div', { class: 'control-row' },
+      h('button', { type: 'button', class: 'chip', disabled: gradingActive || !mic.micSupported(), onclick: () => void calibrate() }, 'Calibrate timing'),
+      h('span', { class: 'meta' }, `Do this once: pick an open string on eight clicks so the app can measure your microphone\u2019s delay${mic.latencyMs() ? ` (now ${Math.round(mic.latencyMs())} ms)` : ''}.`)),
+  ], 'info');
 }
 
 function resultView(r: GradeSummary): HTMLElement {
@@ -591,10 +619,8 @@ function tunesTab(st: State, tn: Tuning): (HTMLElement | null)[] {
           : null,
         tune.capo ? h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: ms.useCapo, onchange: (e: Event) => { ms.useCapo = (e.target as HTMLInputElement).checked; rerender(); } }), `Capo ${tune.capo} (G shapes)`) : null,
       )),
-    ...exerciseView(ex, tn, [
-      h('div', { class: 'prose' },
-        h('p', {}, tune.note),
-        tune.source.url ? h('p', { class: 'meta' }, 'Melody based on the transcription at ', h('a', { href: tune.source.url, target: '_blank', rel: 'noopener' }, tune.source.label), '.') : null),
+    ...exerciseView(ex, tn, h('p', { class: 'lead' }, tune.note), [
+      tune.source.url ? h('p', { class: 'meta source' }, 'Melody based on the transcription at ', h('a', { href: tune.source.url, target: '_blank', rel: 'noopener' }, tune.source.label), '.') : null,
       isUser ? h('button', { type: 'button', class: 'chip', onclick: () => removeUserTune(tune.id) }, 'Remove this tune') : null,
       addTuneForm(),
     ]),
@@ -617,8 +643,8 @@ function addTuneForm(): HTMLElement {
   const area = h('textarea', { rows: 8, spellcheck: 'false', placeholder: 'X:1\nT:Tune name\nM:4/4\nL:1/8\nK:G\n|:"G"GABc dedB|...' });
   return h(
     'details',
-    { class: 'add-tune' },
-    h('summary', {}, 'Add a tune in ABC notation'),
+    { class: 'add-tune disclosure info' },
+    h('summary', {}, h('span', { class: 'disclosure-label' }, 'Add your own tune'), h('span', { class: 'disclosure-summary' }, 'Paste ABC notation')),
     h('p', { class: 'prose' }, 'Paste a tune in ABC, the text format most fiddle-tune sites offer for download. It is saved in this browser only. Chord symbols in quotes ("G") give it a backing track.'),
     area,
     addError ? h('p', { class: 'error' }, addError) : null,
@@ -663,7 +689,7 @@ function licksTab(st: State, tn: Tuning): (HTMLElement | null)[] {
       h('div', { class: 'control-row' },
         select('Lick', lick.id, LICKS.map((l) => ({ value: l.id, label: l.name })), (lickId) => { ms.pick = LICKS.find((l) => l.id === lickId)?.picks ? 'pattern' : ms.pick; setState({ lickId }); })),
       h('div', { class: 'control-row' }, rootPicker(ms.lickKey, (k) => { ms.lickKey = k; rerender(); }, 'Key'))),
-    ...exerciseView(ex, tn, [h('p', { class: 'prose' }, lick.use), h('p', { class: 'meta' }, 'Written in G. Other keys move it to the nearest octave and re-finger it.')]),
+    ...exerciseView(ex, tn, h('p', { class: 'lead' }, lick.use), []),
   ];
 }
 
@@ -679,9 +705,7 @@ function randomTab(tn: Tuning): (HTMLElement | null)[] {
         segmented('Rhythm', r.rhythm, [{ value: 'quarters', label: 'Quarters' }, { value: 'eighths', label: 'Eighths' }, { value: 'mixed', label: 'Mixed' }], (v) => { r.rhythm = v; rerender(); }),
         h('button', { type: 'button', class: 'chip strong', onclick: () => { r.seed++; lastResult = null; rerender(); } }, 'New melody'),
       )),
-    ...exerciseView(ex, tn, [
-      h('p', { class: 'prose' }, 'A fresh melody each time: mostly stepwise, any leap answered by a step back, ending on the root. Read it from the tab, play it, then try singing it before you play it.'),
-    ]),
+    ...exerciseView(ex, tn, h('p', { class: 'lead' }, 'Read it from the tab and play it, then try singing it before you play it again.'), []),
   ];
 }
 
@@ -810,7 +834,7 @@ export function renderMelody(root: HTMLElement, st: State = getState()): void {
   root.replaceChildren(
     h('div', { class: 'controls' },
       h('div', { class: 'control-row' },
-        segmented('Practice', tab, [
+        pageTabs('Melody section', tab, [
           { value: 'warmups', label: 'Warm-ups' },
           { value: 'tunes', label: 'Fiddle tunes' },
           { value: 'licks', label: 'Licks' },

@@ -6,7 +6,7 @@ import {
   INVERSION_NAMES, intervalLabel, intervalName, tuningLabel,
 } from '../theory';
 import { getState, setState, type State, type FretMode, type Pattern } from '../state';
-import { h, s, select, segmented } from './dom';
+import { h, s, select, segmented, disclosure } from './dom';
 import { degreeClass, noteRow, rootPicker, playButton } from './controls';
 import { playNote, playChord, playSequence, playProgression, scaleMidis, chordMidis } from '../audio';
 import { setTrack, guideTrack } from '../metronome';
@@ -270,6 +270,9 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
   const stringSets = Array.from({ length: Math.max(0, tn.strings.length - 2) }, (_, i) => i);
   const num = (i: number) => tn.strings.length - i; // string numbers, 1 = highest
 
+  const tuningName = st.tuningId === 'custom' ? `custom tuning (${tuningLabel(tn)})` : (TUNINGS.find((t) => t.id === st.tuningId)?.name ?? 'Standard').replace(/ \(.*\)$/, '').toLowerCase().replace(/^standard$/, 'standard tuning');
+  const labelName = { intervals: 'interval labels', names: 'note-name labels', none: 'no labels' }[st.labels];
+
   return h(
     'div',
     { class: 'controls' },
@@ -290,93 +293,96 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
       st.fretMode === 'triads'
         ? segmented('Strings', String(Math.min(st.triadSet, stringSets.length - 1)), stringSets.map((i) => ({ value: String(i), label: `${num(i)}-${num(i + 1)}-${num(i + 2)}` })), (v) => setState({ triadSet: Number(v) }))
         : null,
-    ),
-    h(
-      'div',
-      { class: 'control-row' },
-      select('Tuning', st.tuningId, [...TUNINGS.map((t) => ({ value: t.id, label: t.name })), { value: 'custom', label: 'Custom…' }], (tuningId) => setState({ tuningId })),
-      st.tuningId === 'custom'
-        ? h(
-            'label',
-            { class: 'field' },
-            h('span', {}, 'Strings, lowest first'),
-            h('input', {
-              type: 'text',
-              value: st.customTuning,
-              spellcheck: 'false',
-              'aria-invalid': tuningError ? 'true' : 'false',
-              onchange: (e: Event) => setState({ customTuning: (e.target as HTMLInputElement).value }),
-            }),
-            tuningError ? h('em', { class: 'error' }, tuningError) : null,
-          )
+      st.fretMode === 'scale' || st.fretMode === 'chord'
+        ? segmented('Pattern', pattern, patternOpts, (p) => setState({ pattern: p, voicing: null }))
         : null,
-      select('Frets', String(st.frets), [12, 15, 17, 22, 24].map((f) => ({ value: String(f), label: String(f) })), (v) => setState({ frets: Number(v) })),
-      segmented('Labels', st.labels, [{ value: 'intervals', label: 'Intervals' }, { value: 'names', label: 'Notes' }, { value: 'none', label: 'None' }], (labels) => setState({ labels })),
+      pattern === 'caged'
+        ? segmented('Shape', st.caged, (['all', 'C', 'A', 'G', 'E', 'D'] as const).map((v) => ({ value: v, label: v === 'all' ? 'All' : v })), (caged) => setState({ caged }))
+        : null,
+      pattern === '3nps'
+        ? segmented('Position', String(st.npsPosition), [1, 2, 3, 4, 5, 6, 7].map((p) => ({ value: String(p), label: String(p) })), (v) => setState({ npsPosition: Number(v) }))
+        : null,
     ),
-    st.fretMode === 'scale' || st.fretMode === 'chord'
-      ? h(
-          'div',
-          { class: 'control-row' },
-          segmented('Pattern', pattern, patternOpts, (p) => setState({ pattern: p, voicing: null })),
-          pattern === 'caged'
-            ? segmented('Shape', st.caged, (['all', 'C', 'A', 'G', 'E', 'D'] as const).map((v) => ({ value: v, label: v === 'all' ? 'All' : v })), (caged) => setState({ caged }))
-            : null,
-          pattern === '3nps'
-            ? segmented('Position', String(st.npsPosition), [1, 2, 3, 4, 5, 6, 7].map((p) => ({ value: String(p), label: String(p) })), (v) => setState({ npsPosition: Number(v) }))
-            : null,
-        )
-      : null,
+    disclosure('fret-settings', 'Neck settings', `${tuningName[0].toUpperCase()}${tuningName.slice(1)}, ${st.frets} frets, ${labelName}`, [
+      h(
+        'div',
+        { class: 'control-row' },
+        select('Tuning', st.tuningId, [...TUNINGS.map((t) => ({ value: t.id, label: t.name })), { value: 'custom', label: 'Custom…' }], (tuningId) => setState({ tuningId })),
+        st.tuningId === 'custom'
+          ? h(
+              'label',
+              { class: 'field' },
+              h('span', {}, 'Strings, lowest first'),
+              h('input', {
+                type: 'text',
+                value: st.customTuning,
+                spellcheck: 'false',
+                'aria-invalid': tuningError ? 'true' : 'false',
+                onchange: (e: Event) => setState({ customTuning: (e.target as HTMLInputElement).value }),
+              }),
+              tuningError ? h('em', { class: 'error' }, tuningError) : null,
+            )
+          : null,
+        select('Frets', String(st.frets), [12, 15, 17, 22, 24].map((f) => ({ value: String(f), label: String(f) })), (v) => setState({ frets: Number(v) })),
+        segmented('Labels', st.labels, [{ value: 'intervals', label: 'Intervals' }, { value: 'names', label: 'Notes' }, { value: 'none', label: 'None' }], (labels) => setState({ labels })),
+      ),
+    ]),
+    tuningError ? h('p', { class: 'error' }, `Custom tuning: ${tuningError}. Showing standard tuning instead.`) : null,
   );
 }
 
 /* ---------- Info panel ---------- */
 
-function info(st: State, r: Resolved, tn: Tuning, voicings: TriadVoicing[], cagedActive: boolean, shapes: CagedShape[], nps: NpsPosition | undefined, play: HTMLElement | null): HTMLElement {
-  const parts: (HTMLElement | null)[] = [
+function info(st: State, r: Resolved, voicings: TriadVoicing[], cagedActive: boolean, shapes: CagedShape[], nps: NpsPosition | undefined, play: HTMLElement | null): HTMLElement {
+  const explain: HTMLElement[] = [];
+  if (st.fretMode === 'triads') {
+    explain.push(
+      h('p', {}, 'A triad on three adjacent strings can start on any of its three notes. With the root on the lowest string it is in root position; with the 3rd on the bottom it is in 1st inversion; with the 5th on the bottom, 2nd inversion. Climb the neck and the three shapes repeat in that cycle.'),
+      h('p', {}, 'These small grips are how mandolin and guitar players comp up the neck and how a lead part can outline the chord changes.'),
+    );
+  }
+  if (cagedActive) {
+    const order = shapes.slice(0, 5).map((x) => x.name).join(' → ');
+    explain.push(
+      h('p', {}, `CAGED links the five open chord shapes (C, A, G, E and D) into a chain that covers the whole neck. Moved up to ${noteName(st.root)}, they run ${order} from the nut upward, each sharing notes with the next.`),
+      h('p', {}, st.fretMode === 'scale'
+        ? 'Each colored box is one scale position built around a chord shape. Learn the chord shape first, then the scale notes that surround it.'
+        : 'Ringed notes are the chord grip itself. The other chord tones in the box are there to find alternative voicings.'),
+    );
+  }
+  if (nps) {
+    explain.push(
+      h('p', {}, `Three notes on every string, starting from scale degree ${nps.number} on the lowest string. Seven positions, one per scale degree, tile the whole neck and overlap with their neighbors.`),
+      h('p', {}, 'The even three-note groups make these patterns ideal for alternate picking and speed work: every string gets the same down-up-down (or up-down-up) motion.'),
+    );
+  }
+  const topic = st.fretMode === 'triads' ? 'triad inversions' : cagedActive ? 'CAGED' : nps ? 'three notes per string' : '';
+  const counts = [0, 1, 2].map((inv) => voicings.filter((v) => v.inversion === inv).length);
+
+  return h(
+    'div',
+    { class: 'fret-info' },
     h('div', { class: 'title-row' }, h('h2', {}, r.title), play),
     st.fretMode !== 'notes' ? noteRow(r.notes, r.intervals) : null,
     h('p', { class: 'prose' }, r.blurb),
-  ];
-
-  if (st.fretMode === 'triads') {
-    const counts = [0, 1, 2].map((inv) => voicings.filter((v) => v.inversion === inv).length);
-    parts.push(
-      h('div', { class: 'prose' },
-        h('p', {}, 'A triad on three adjacent strings can start on any of its three notes. With the root on the lowest string it is in root position; with the 3rd on the bottom it is in 1st inversion; with the 5th on the bottom, 2nd inversion. Climb the neck and the three shapes repeat in that cycle.'),
-        h('p', {}, 'These small grips are how mandolin and guitar players comp up the neck and how a lead part can outline the chord changes.'),
-      ),
-      h('ul', { class: 'legend' }, ...[0, 1, 2].map((inv) => h('li', { class: `inv-${inv}` }, h('i', {}), `${INVERSION_NAMES[inv]} (${counts[inv]})`))),
-    );
-  }
-
-  if (cagedActive) {
-    const order = shapes.slice(0, 5).map((x) => x.name).join(' → ');
-    parts.push(
-      h('div', { class: 'prose' },
-        h('p', {}, `CAGED links the five open chord shapes (C, A, G, E and D) into a chain that covers the whole neck. Moved up to ${noteName(st.root)}, they run ${order} from the nut upward, each sharing notes with the next.`),
-        h('p', {}, st.fretMode === 'scale'
-          ? 'Each colored box is one scale position built around a chord shape. Learn the chord shape first, then the scale notes that surround it.'
-          : 'Ringed notes are the chord grip itself. The other chord tones in the box are there to find alternative voicings.'),
-      ),
-    );
-  }
-
-  if (nps) {
-    parts.push(
-      h('div', { class: 'prose' },
-        h('p', {}, `Three notes on every string, starting from scale degree ${nps.number} on the lowest string. Seven positions, one per scale degree, tile the whole neck and overlap with their neighbors.`),
-        h('p', {}, 'The even three-note groups make these patterns ideal for alternate picking and speed work: every string gets the same down-up-down (or up-down-up) motion.'),
-      ),
-    );
-  }
-
-  parts.push(
-    h('p', { class: 'meta' }, `Tuning: ${tuningLabel(tn)}${isStandard(tn) ? '' : ' (non-standard)'}`),
-    h('ul', { class: 'legend degrees' },
-      ...['1', '2', '3', '4', '5', '6', '7'].map((d) => h('li', { class: `deg-${d}` }, h('i', {}), d === '1' ? 'Root' : `${d}${d === '2' ? 'nd' : d === '3' ? 'rd' : 'th'}${d === '2' ? ' or 9th' : d === '4' ? ' or 11th' : d === '6' ? ' or 13th' : ''}`)),
-    ),
+    st.fretMode === 'triads'
+      ? h('ul', { class: 'legend' }, ...[0, 1, 2].map((inv) => h('li', { class: `inv-${inv}` }, h('i', {}), `${INVERSION_NAMES[inv]} (${counts[inv]})`)))
+      : null,
+    explain.length ? disclosure(`fret-explain-${topic}`, `How ${topic} works`, '', [h('div', { class: 'prose' }, ...explain)], 'info') : null,
   );
-  return h('div', { class: 'fret-info' }, ...parts);
+}
+
+/** Color key for the dots, with the one thing to know about using the neck. */
+function neckFoot(st: State): HTMLElement {
+  return h(
+    'div',
+    { class: 'neck-foot' },
+    st.fretMode === 'notes'
+      ? h('span', {})
+      : h('ul', { class: 'legend degrees', 'aria-label': 'Dot colors' },
+        ...['1', '2', '3', '4', '5', '6', '7'].map((d) => h('li', { class: `deg-${d}` }, h('i', {}), d === '1' ? 'Root' : `${d}${d === '2' ? 'nd' : d === '3' ? 'rd' : 'th'}`))),
+    h('span', { class: 'hint' }, st.fretMode === 'triads' ? 'Tap a note to hear it, or a line to strum the triad.' : 'Tap a note to hear it.'),
+  );
 }
 
 /* ---------- Render ---------- */
@@ -486,9 +492,9 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
   root.replaceChildren(
     controls(st, tn, error, r),
     h('div', { class: 'neck-scroll', tabindex: '0', 'aria-label': 'Fretboard, scroll horizontally' }, svg),
-    h('p', { class: 'hint' }, st.fretMode === 'triads' ? 'Select any note to hear it, or a connecting line to strum that triad.' : 'Select any note to hear it.'),
+    neckFoot(st),
+    info(st, r, voicings, cagedActive, shapes, nps, play),
     ...(st.fretMode === 'chord' ? [voicingLibrary(r, tn, library, chosen, opens)] : []),
-    info(st, r, tn, voicings, cagedActive, shapes, nps, play),
   );
 }
 
@@ -519,7 +525,7 @@ function voicingLibrary(r: Resolved, tn: Tuning, library: Voicing[], chosen: Voi
     h('div', { class: 'h3-row' },
       h('h3', {}, `Voicings (${library.length})`),
       chosen ? h('button', { type: 'button', class: 'chip', onclick: () => setState({ voicing: null }) }, 'Show all chord tones') : null),
-    h('p', { class: 'hint' }, 'Playable shapes with the root in the bass. Select one to see it on the neck and hear it.'),
+    h('p', { class: 'hint' }, 'Root in the bass. Tap one to hear it and see it on the neck.'),
     h(
       'ol',
       { class: 'voicing-grid' },

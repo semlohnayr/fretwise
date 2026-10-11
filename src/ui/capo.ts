@@ -23,7 +23,7 @@ function finder(st: State): HTMLElement {
     'section',
     { class: 'capo-finder' },
     h('h2', {}, 'Find a capo position'),
-    h('p', { class: 'prose' }, `Pick the key you need to sound in, for example a singer's key. Each card is an open-chord key you already know and the fret to clamp the capo on.`),
+    h('p', { class: 'lead' }, `Pick the key you need to sound in, such as a singer's key. Each card is an open-chord key you know and the fret to put the capo on.`),
     h(
       'div',
       { class: 'controls' },

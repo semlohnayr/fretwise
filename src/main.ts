@@ -1,5 +1,4 @@
 import { getState, setState, subscribe, fromHash, type State, type View } from './state';
-import { noteName } from './theory';
 import { renderCircle } from './ui/circle';
 import { renderFretboard } from './ui/fretboard';
 import { renderModes } from './ui/modes';
@@ -12,38 +11,60 @@ import { isMuted, setMuted, onMuteChange, audioSupported } from './audio';
 import { initMetronome } from './ui/metronome';
 import { setTrack } from './metronome';
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'circle', label: 'Circle of fifths' },
-  { id: 'fretboard', label: 'Fretboard' },
-  { id: 'modes', label: 'Modes' },
-  { id: 'melody', label: 'Melody' },
-  { id: 'capo', label: 'Capo' },
-  { id: 'practice', label: 'Practice' },
-  { id: 'sessions', label: 'Sessions' },
+/**
+ * Two groups: reference tools for looking things up, then pages for playing.
+ * (Route ids stay as they were so old links keep working; "practice" is the
+ * quiz page and "sessions" is the practice-plan page.)
+ */
+const NAV: { group: string; views: { id: View; label: string; title: string }[] }[] = [
+  {
+    group: 'Learn',
+    views: [
+      { id: 'circle', label: 'Circle', title: 'Circle of fifths, keys and chords' },
+      { id: 'fretboard', label: 'Fretboard', title: 'Scales, chords, triads and patterns on the neck' },
+      { id: 'modes', label: 'Modes', title: 'The seven modes compared' },
+      { id: 'capo', label: 'Capo', title: 'Capo calculator' },
+    ],
+  },
+  {
+    group: 'Play',
+    views: [
+      { id: 'melody', label: 'Melody', title: 'Warm-ups, fiddle tunes, licks and improvising' },
+      { id: 'practice', label: 'Quizzes', title: 'Note, interval and ear-training quizzes' },
+      { id: 'sessions', label: 'Practice', title: 'Timed practice plans and your practice log' },
+    ],
+  },
 ];
 
 const nav = document.querySelector<HTMLElement>('#views')!;
 const main = document.querySelector<HTMLElement>('#main')!;
-const context = document.querySelector<HTMLElement>('#context')!;
 
 let lastView: View | null = null;
 
 function render(st: State): void {
   nav.replaceChildren(
-    ...VIEWS.map((v) => {
-      const a = document.createElement('a');
-      a.href = `#${v.id}`;
-      a.textContent = v.label;
-      if (v.id === st.view) a.setAttribute('aria-current', 'page');
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        setState({ view: v.id });
-      });
-      return a;
+    ...NAV.map((g) => {
+      const group = document.createElement('div');
+      group.className = 'nav-group';
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-label', g.group);
+      for (const v of g.views) {
+        const a = document.createElement('a');
+        a.href = `#${v.id}`;
+        a.textContent = v.label;
+        a.title = v.title;
+        if (v.id === st.view) a.setAttribute('aria-current', 'page');
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          setState({ view: v.id });
+        });
+        group.append(a);
+      }
+      return group;
     }),
   );
-  context.parentElement!.hidden = st.view === 'capo' || st.view === 'practice' || st.view === 'melody' || st.view === 'sessions';
-  context.textContent = `${noteName(st.root)}${st.keyQuality === 'minor' && st.view === 'circle' ? ' minor' : ''}`;
+  // Keep the current page's link in view when the nav scrolls sideways on a phone.
+  nav.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
   // Keep focus and scroll stable when re-rendering the same view.
   const focusedLabel = document.activeElement?.getAttribute('aria-label') ?? (document.activeElement as HTMLElement | null)?.textContent;
@@ -81,6 +102,7 @@ const sound = document.querySelector<HTMLButtonElement>('#sound')!;
 const paintSound = (m: boolean) => {
   sound.setAttribute('aria-pressed', String(!m));
   sound.querySelector('span')!.textContent = m ? 'Sound off' : 'Sound on';
+  sound.setAttribute('aria-label', m ? 'Sound off' : 'Sound on');
 };
 if (!audioSupported()) sound.hidden = true;
 paintSound(isMuted());

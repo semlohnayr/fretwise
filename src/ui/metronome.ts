@@ -218,3 +218,9 @@ export function initMetronome(): void {
   });
   render();
 }
+
+/** Open the dock with the speed-trainer settings showing. */
+export function openSpeedTrainer(): void {
+  showSettings = true;
+  setOpen(true);
+}

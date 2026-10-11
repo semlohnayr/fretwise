@@ -16,10 +16,9 @@ function planCard(plan: Plan): HTMLElement {
   const total = session.planMinutes(plan).reduce((a, b) => a + b, 0);
   const on = plan.id === selected;
   return h('li', {},
-    h('button', { type: 'button', class: on ? 'on' : '', 'aria-pressed': String(on), onclick: () => { selected = plan.id; rerender(); } },
+    h('button', { type: 'button', class: on ? 'on' : '', 'aria-pressed': String(on), title: plan.summary, onclick: () => { selected = plan.id; rerender(); } },
       h('b', {}, plan.name),
-      h('span', { class: 'plan-time' }, `${total} min, ${plan.steps.length} steps`),
-      h('small', {}, plan.summary)));
+      h('span', { class: 'plan-time' }, `${total} min`)));
 }
 
 function planDetail(plan: Plan): HTMLElement {
@@ -38,7 +37,7 @@ function planDetail(plan: Plan): HTMLElement {
         ? h('span', { class: 'capo-tag' }, 'Running')
         : h('button', { type: 'button', class: 'play', onclick: () => { session.start(plan.id); const first = plan.steps[0]; if (first.open) openStep(first.open); else rerender(); } },
           running ? 'Start this plan instead' : 'Start session')),
-    h('p', { class: 'prose' }, plan.summary),
+    h('p', { class: 'lead' }, plan.summary),
     h(
       'ol',
       { class: 'plan-steps' },
@@ -77,7 +76,7 @@ function logView(): HTMLElement {
       h('div', {}, h('dt', {}, 'Streak'), h('dd', {}, `${streak(log, today)} ${streak(log, today) === 1 ? 'day' : 'days'}`)),
       h('div', {}, h('dt', {}, 'Last 7 days'), h('dd', {}, `${weekMinutes(log, today)} min`)),
       h('div', {}, h('dt', {}, 'Sessions'), h('dd', {}, String(log.length)))),
-    h('ol', { class: 'day-bars', 'aria-label': 'Minutes practiced each day, last two weeks' },
+    log.length === 0 ? null : h('ol', { class: 'day-bars', 'aria-label': 'Minutes practiced each day, last two weeks' },
       ...days.map((d) => h('li', { title: `${d.date}: ${d.minutes} min` },
         h('span', { class: 'bar', style: `height:${Math.round((d.minutes / max) * 100)}%` }),
         h('small', {}, dayName(d.date).slice(0, 2))))),
@@ -127,7 +126,7 @@ export function renderSessions(root: HTMLElement, _st: State = getState()): void
     h('div', { class: 'sessions-layout' },
       h('div', {},
         h('h2', {}, 'Practice plans'),
-        h('p', { class: 'prose' }, 'Pick a plan and start it. A bar under the header keeps time and takes you to each exercise; a soft chime marks the end of each step. Adjust the minutes before you start to fit your day.'),
+        h('p', { class: 'lead' }, 'Start a plan and a timer bar walks you through each step, taking you to the right exercise.'),
         h('ol', { class: 'plan-cards' }, ...PLANS.map(planCard)),
         planDetail(plan)),
       h('div', {}, logView(), tips())),

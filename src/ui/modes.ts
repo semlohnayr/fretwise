@@ -3,7 +3,7 @@ import {
   noteName, intervalLabel, relativeMinor, pc,
 } from '../theory';
 import { getState, setState, type State } from '../state';
-import { h, segmented } from './dom';
+import { h, segmented, disclosure } from './dom';
 import { degreeClass, noteRow, rootPicker, playButton } from './controls';
 import { playScaleWithDrone, scaleMidis } from '../audio';
 
@@ -99,11 +99,14 @@ function detail(st: State, mode: ModeInfo): HTMLElement {
       { class: 'prose' },
       h('p', {}, mode.feel),
       h('p', {}, `Characteristic note: the ${mode.characteristic}. ${mode.quality === 'major' ? 'Compared with plain major' : mode.quality === 'minor' ? 'Compared with natural minor' : 'Compared with Phrygian'}, this is the note to lean on so the mode is heard.`),
-      neighbor ? h('p', {}, `One step brighter is ${neighbor.name}: raise one note of ${mode.name} by a half step and you get there.`) : h('p', {}, 'Nothing is brighter than Lydian: every note sits as high as it can while keeping a perfect 5th.'),
-      h('p', {}, h('b', {}, 'Harmony. '), mode.harmony),
-      h('p', {}, h('b', {}, 'Where you hear it. '), mode.examples),
-      h('p', {}, `Same notes as ${noteName(parent)} major (and ${noteName(relativeMinor(parent))} minor), but centered on ${noteName(st.root)}.`),
     ),
+    disclosure(`mode-more-${mode.id}`, `More about ${mode.name}`, 'harmony, where you hear it', [
+      h('div', { class: 'prose' },
+        h('p', {}, h('b', {}, 'Harmony. '), mode.harmony),
+        h('p', {}, h('b', {}, 'Where you hear it. '), mode.examples),
+        neighbor ? h('p', {}, `One step brighter is ${neighbor.name}: raise one note of ${mode.name} by a half step and you get there.`) : h('p', {}, 'Nothing is brighter than Lydian: every note sits as high as it can while keeping a perfect 5th.'),
+        h('p', {}, `Same notes as ${noteName(parent)} major (and ${noteName(relativeMinor(parent))} minor), but centered on ${noteName(st.root)}.`)),
+    ], 'info'),
     h('h3', {}, 'Chords of the mode'),
     h(
       'ol',
