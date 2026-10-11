@@ -98,3 +98,43 @@ export function segmented<T extends string>(
     ),
   );
 }
+
+/* ---------- Disclosure panels ---------- */
+
+/** Panels the user has opened. Pages redraw on every change, so open state lives here. */
+const openPanels = new Set<string>();
+
+/**
+ * A collapsible panel for secondary settings or explanations. `summary` is a
+ * short description of the current settings, shown while closed so nothing
+ * is hidden from view entirely.
+ */
+export function disclosure(
+  id: string,
+  label: string | Node,
+  summary: string,
+  children: (Child | Child[])[],
+  kind: 'options' | 'info' = 'options',
+): HTMLDetailsElement {
+  const d = h(
+    'details',
+    { class: `disclosure ${kind}`, open: openPanels.has(id) },
+    h('summary', {}, h('span', { class: 'disclosure-label' }, label), summary ? h('span', { class: 'disclosure-summary' }, summary) : null),
+    h('div', { class: 'disclosure-body' }, ...children),
+  );
+  d.addEventListener('toggle', () => {
+    if (d.open) openPanels.add(id);
+    else openPanels.delete(id);
+  });
+  return d;
+}
+
+/** Lets other code open a panel ahead of the next redraw (e.g. "show me the settings"). */
+export const openPanel = (id: string): void => void openPanels.add(id);
+
+/** Section tabs at the top of a page: the same control as `segmented`, styled as tabs. */
+export function pageTabs<T extends string>(label: string, value: T, options: { value: T; label: string }[], onChange: (v: T) => void): HTMLElement {
+  const el = segmented(label, value, options, onChange);
+  el.classList.add('page-tabs');
+  return el;
+}

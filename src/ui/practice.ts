@@ -4,7 +4,7 @@ import {
   noteName, pc, spellPc, stringMidis, tuningLabel,
 } from '../theory';
 import { getState, setState, type State, type QuizKind } from '../state';
-import { h, segmented } from './dom';
+import { h, segmented, pageTabs } from './dom';
 import { playButton } from './controls';
 import { getTuning, neckSvg } from './fretboard';
 import { playNote, playChord, playSequence, isMuted } from '../audio';
@@ -266,7 +266,7 @@ export function renderPractice(root: HTMLElement, st: State = getState()): void 
   root.replaceChildren(
     h('div', { class: 'controls' },
       h('div', { class: 'control-row' },
-        segmented('Practice', kind, QUIZZES, (quiz) => {
+        pageTabs('Quiz', kind, QUIZZES, (quiz) => {
           window.clearTimeout(advanceTimer);
           setState({ quiz });
         })),

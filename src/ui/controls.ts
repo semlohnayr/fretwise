@@ -50,5 +50,16 @@ export function playButton(label: string, onPlay: () => void, extraClass = ''): 
   icon.setAttribute('viewBox', '0 0 12 12');
   icon.setAttribute('aria-hidden', 'true');
   icon.innerHTML = '<path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/>';
-  return h('button', { type: 'button', class: `play ${extraClass}`, onclick: onPlay }, icon, label);
+  // preventDefault/stopPropagation: a play button may sit inside a <summary> without toggling it.
+  const btn = h('button', {
+    type: 'button',
+    class: `play ${extraClass}`,
+    onclick: (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onPlay();
+    },
+  }, icon, label);
+  if (!label) btn.setAttribute('aria-label', 'Play');
+  return btn;
 }

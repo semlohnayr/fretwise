@@ -3,7 +3,7 @@ import {
   harmonize, scaleById, scaleNotes, MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, progressionChords, mod,
 } from '../theory';
 import { getState, setState, type State } from '../state';
-import { h, s, clickable } from './dom';
+import { h, s, clickable, disclosure } from './dom';
 import { noteRow, playButton } from './controls';
 import { playChord, playProgression, playSequence, chordMidis, scaleMidis } from '../audio';
 import type { DiatonicChord } from '../theory';
@@ -116,12 +116,9 @@ function keyPanel(st: State): HTMLElement {
   return h(
     'div',
     { class: 'key-panel' },
-    h('h2', {}, `${noteName(st.root)} ${isMajor ? 'major' : 'minor'}`),
-    h(
-      'p',
-      { class: 'sig-line' },
-      sig.accidentals.length ? `Key signature: ${sig.accidentals.join(' ')}` : 'Key signature: no sharps or flats',
-    ),
+    h('div', { class: 'title-row' },
+      h('h2', {}, `${noteName(st.root)} ${isMajor ? 'major' : 'minor'}`),
+      h('span', { class: 'sig-line' }, sig.accidentals.length ? `Key signature ${sig.accidentals.join(' ')}` : 'No sharps or flats')),
     h(
       'div',
       { class: 'chip-row' },
@@ -132,15 +129,20 @@ function keyPanel(st: State): HTMLElement {
       enharmonic
         ? h('button', { type: 'button', class: 'chip', onclick: () => setState({ root: enharmonic }) }, `Spell as ${noteName(enharmonic)}${isMajor ? '' : 'm'}`)
         : null,
-      h('button', { type: 'button', class: 'chip strong', onclick: () => setState({ view: 'fretboard', fretMode: 'scale', scaleId: isMajor ? 'ionian' : 'aeolian' }) }, 'Show scale on fretboard'),
     ),
 
     h('div', { class: 'h3-row' },
       h('h3', {}, 'Scale'),
-      playButton('Play scale', () => {
-        const run = scaleMidis(pc(st.root), scale.formula.map((i) => i.semitones));
-        playSequence([...run, ...[...run].reverse().slice(1)], 0.24);
-      }),
+      h('div', { class: 'h3-actions' },
+        (() => {
+          const b = playButton('Play', () => {
+            const run = scaleMidis(pc(st.root), scale.formula.map((i) => i.semitones));
+            playSequence([...run, ...[...run].reverse().slice(1)], 0.24);
+          }, 'small');
+          b.setAttribute('aria-label', 'Play scale');
+          return b;
+        })(),
+        h('button', { type: 'button', class: 'chip', 'aria-label': 'Show scale on the fretboard', onclick: () => setState({ view: 'fretboard', fretMode: 'scale', scaleId: isMajor ? 'ionian' : 'aeolian' }) }, 'On the fretboard')),
     ),
     noteRow(notes, scale.formula),
 
@@ -161,16 +163,19 @@ function keyPanel(st: State): HTMLElement {
           {},
           h(
             'button',
-            { type: 'button', title: 'Show on fretboard', onclick: () => c.chord && openChord(c.root, c.chord.id) },
+            { type: 'button', title: `Show ${c.symbol} on the fretboard`, onclick: () => c.chord && openChord(c.root, c.chord.id) },
             h('span', { class: 'roman' }, c.roman),
             h('b', {}, c.symbol),
             h('small', {}, c.notes.map((x) => noteName(x)).join(' ')),
           ),
-          playButton('', () => playChord(midisOf(c)), 'mini'),
+          (() => {
+            const b = playButton('', () => playChord(midisOf(c)), 'mini');
+            b.setAttribute('aria-label', `Play ${c.symbol}`);
+            return b;
+          })(),
         ),
       ),
     ),
-    h('p', { class: 'hint' }, 'Select a chord to see it on the fretboard, or its play button to hear it.'),
 
     h('h3', {}, 'Common progressions'),
     h(
@@ -178,19 +183,24 @@ function keyPanel(st: State): HTMLElement {
       { class: 'progressions' },
       ...progressions.map((p) => {
         const pcs = progressionChords(st.root, isMajor ? 'ionian' : 'aeolian', p);
+        // One line per progression; the explanation and chord links open on demand.
+        const head = h('span', { class: 'prog-head' },
+          h('b', {}, p.name),
+          h('span', { class: 'prog-chords-text' }, pcs.map((c) => c.symbol).join(' ')),
+          h('span', { class: 'prog-romans' }, pcs.map((c) => c.roman).join(' – ')),
+          (() => {
+            const b = playButton('', () => playProgression(pcs.map(midisOf)), 'mini');
+            b.setAttribute('aria-label', `Play ${p.name}`);
+            return b;
+          })());
         return h(
           'li',
           {},
-          h('div', { class: 'prog-head' },
-            h('b', {}, p.name),
-            h('span', { class: 'prog-romans' }, pcs.map((c) => c.roman).join(' – ')),
-            playButton('Play', () => playProgression(pcs.map(midisOf)), 'small')),
-          h(
-            'div',
-            { class: 'prog-chords' },
-            ...pcs.map((c) => h('button', { type: 'button', class: 'chip', onclick: () => c.chord && openChord(c.root, c.chord.id) }, c.symbol)),
-          ),
-          h('p', {}, p.note),
+          disclosure(`prog-${p.name}`, head, '', [
+            h('p', {}, p.note),
+            h('div', { class: 'prog-chords' },
+              ...pcs.map((c) => h('button', { type: 'button', class: 'chip', title: `Show ${c.symbol} on the fretboard`, onclick: () => c.chord && openChord(c.root, c.chord.id) }, c.symbol))),
+          ], 'info'),
         );
       }),
     ),

@@ -47,7 +47,7 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - Playback runs through the metronome, so the count-in, click and speed trainer all apply, with an optional boom-chuck backing from the tune's chords.
 - Grade my playing: play the phrase into your microphone after a count-in and get each note marked right, wrong octave, wrong note or not heard, with your average timing (rushing or dragging). A one-time calibration measures your microphone's delay. Grading listens for each pick attack and the new pitch at that moment, so strings ringing over each other do not throw it off.
 
-**Sessions**
+**Practice** (practice plans)
 - Five practice plans (Quick 15, Balanced 30, Speed builder, Learn a tune, Know the neck), each a list of timed steps with a short how-to.
 - Start a plan and a bar under the header counts down each step, plays a soft chime when its time is up, and takes you straight to the exercise. Pause, skip ahead or end at any time; adjust step lengths before you start.
 - A practice log in your browser tracks minutes per day, the last seven days and your streak.
@@ -59,13 +59,15 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - Pick the key you need to sound in and see which open-chord keys (G, C, D, A, E; Em, Am, Dm) get you there and on which fret.
 - Translate any shape key and capo position chord by chord into the sounding key, with playback at concert pitch.
 
-**Practice**
+**Quizzes**
 - Find the note: name a highlighted fret (naturals or all 12, any tuning).
 - Intervals on the neck: name the distance between two marked notes.
 - Intervals by ear and chords by ear: melodic or harmonic intervals; triad or seventh-chord qualities.
 - Score, streak and a best streak that is saved in your browser.
 
 Links are shareable: the URL hash carries the view, root, scale, chord and fretboard mode (for example `#fretboard?root=A&scale=dorian&mode=scale`).
+
+The navigation is split into **Learn** (Circle, Fretboard, Modes, Capo) and **Play** (Melody, Quizzes, Practice). Each page leads with its main controls and the thing you look at; secondary settings (neck tuning and labels, playback and picking options) and longer explanations sit in panels you open when you need them.
 
 ## Correct spelling
 
