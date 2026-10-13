@@ -4,7 +4,7 @@ export type View = 'circle' | 'fretboard' | 'modes' | 'melody' | 'capo' | 'pract
 export type Pattern = 'none' | 'caged' | '3nps';
 export type QuizKind = 'note' | 'fret-interval' | 'ear-interval' | 'ear-chord';
 export type MelodyTab = 'warmups' | 'tunes' | 'licks' | 'random' | 'changes';
-export type FretMode = 'scale' | 'chord' | 'triads' | 'notes';
+export type FretMode = 'scale' | 'chord' | 'caged' | 'triads' | 'notes';
 export type LabelMode = 'names' | 'intervals' | 'none';
 
 export interface State {
@@ -117,6 +117,6 @@ export function fromHash(): Partial<State> {
   const chord = p.get('chord');
   if (chord && CHORDS.some((x) => x.id === chord)) out.chordId = chord;
   const mode = p.get('mode');
-  if (mode === 'scale' || mode === 'chord' || mode === 'triads' || mode === 'notes') out.fretMode = mode;
+  if (mode === 'scale' || mode === 'chord' || mode === 'caged' || mode === 'triads' || mode === 'notes') out.fretMode = mode;
   return out;
 }

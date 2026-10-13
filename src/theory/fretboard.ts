@@ -64,21 +64,38 @@ interface ShapeTemplate {
   offsets: (number | null)[];
 }
 
-const MAJOR_SHAPES: Record<CagedName, ShapeTemplate> = {
-  C: { ref: 1, offsets: [null, 0, -1, -3, -2, -3] },
-  A: { ref: 1, offsets: [null, 0, 2, 2, 2, 0] },
-  G: { ref: 0, offsets: [0, -1, -3, -3, -3, 0] },
-  E: { ref: 0, offsets: [0, 2, 2, 1, 0, 0] },
-  D: { ref: 2, offsets: [null, null, 0, 2, 3, 2] },
+/** Build a template from an open-position (or any-position) grip such as "x32010". */
+function grip(ref: number, frets: string): ShapeTemplate {
+  const f = frets.split('').map((c) => (c === 'x' ? null : Number(c)));
+  const r0 = f[ref]!;
+  return { ref, offsets: f.map((x) => (x === null ? null : x - r0)) };
+}
+
+/**
+ * CAGED shapes for common chord types, each written as its familiar grip
+ * (open position where there is one) with the string that carries the root
+ * the shape is named and moved by. Moving a shape up the neck keeps every
+ * fret's distance from that root. Shapes that are rarely played for a chord
+ * type are left out rather than forced.
+ */
+export const CAGED_CHORDS: Record<string, Partial<Record<CagedName, ShapeTemplate>>> = {
+  maj: { C: grip(1, 'x32010'), A: grip(1, 'x02220'), G: grip(0, '320003'), E: grip(0, '022100'), D: grip(2, 'xx0232') },
+  min: { C: grip(1, 'x31013'), A: grip(1, 'x02210'), G: grip(0, '310033'), E: grip(0, '022000'), D: grip(2, 'xx0231') },
+  '7': { C: grip(1, 'x32310'), A: grip(1, 'x02020'), G: grip(0, '320001'), E: grip(0, '020100'), D: grip(2, 'xx0212') },
+  maj7: { C: grip(1, 'x32000'), A: grip(1, 'x02120'), G: grip(0, '320002'), E: grip(0, '021100'), D: grip(2, 'xx0222') },
+  m7: { C: grip(1, 'x3131x'), A: grip(1, 'x02010'), E: grip(0, '020000'), D: grip(2, 'xx0211') },
+  '6': { C: grip(1, 'x32210'), A: grip(1, 'x02222'), G: grip(0, '320000'), E: grip(0, '022120'), D: grip(2, 'xx0202') },
+  m6: { A: grip(1, 'x02212'), E: grip(0, '022020'), D: grip(2, 'xx0201') },
+  sus4: { C: grip(1, 'x33011'), A: grip(1, 'x02230'), G: grip(0, '330013'), E: grip(0, '022200'), D: grip(2, 'xx0233') },
+  sus2: { C: grip(1, 'x30033'), A: grip(1, 'x02200'), G: grip(0, '300033'), D: grip(2, 'xx0230') },
+  add9: { C: grip(1, 'x32030'), A: grip(1, 'x02420'), G: grip(0, '320203'), E: grip(0, '024100') },
+  '9': { C: grip(1, 'x32333'), E: grip(0, '020102') },
+  m7b5: { A: grip(1, 'x3434x'), E: grip(0, '7x776x'), D: grip(2, 'xx0111') },
+  dim7: { A: grip(1, 'x3424x'), E: grip(0, '012020'), D: grip(2, 'xx0101') },
 };
 
-const MINOR_SHAPES: Record<CagedName, ShapeTemplate> = {
-  C: { ref: 1, offsets: [null, 0, -2, -3, -2, 0] },
-  A: { ref: 1, offsets: [null, 0, 2, 2, 1, 0] },
-  G: { ref: 0, offsets: [0, -2, -3, -3, 0, 0] },
-  E: { ref: 0, offsets: [0, 2, 2, 0, 0, 0] },
-  D: { ref: 2, offsets: [null, null, 0, 2, 3, 1] },
-};
+/** Chord types (ids from CHORDS) that have CAGED shapes. */
+export const CAGED_CHORD_IDS = Object.keys(CAGED_CHORDS);
 
 export interface CagedShape {
   name: CagedName;
@@ -97,10 +114,16 @@ const STANDARD_PCS = [4, 9, 2, 7, 11, 4];
  * sorted by position. Each shape usually appears once or twice below fret 22.
  */
 export function cagedShapes(root: Note, quality: 'major' | 'minor', maxFret: number): CagedShape[] {
-  const table = quality === 'major' ? MAJOR_SHAPES : MINOR_SHAPES;
+  return cagedChordShapes(root, quality === 'major' ? 'maj' : 'min', maxFret);
+}
+
+/** Every instance of every CAGED shape for a chord type that fits below `maxFret`, low to high. */
+export function cagedChordShapes(root: Note, chordId: string, maxFret: number): CagedShape[] {
+  const table = CAGED_CHORDS[chordId] ?? {};
   const out: CagedShape[] = [];
   for (const name of CAGED_ORDER) {
     const tpl = table[name];
+    if (!tpl) continue;
     const played = tpl.offsets.filter((o): o is number => o !== null);
     const lo = Math.min(...played);
     const hi = Math.max(...played);

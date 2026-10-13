@@ -688,7 +688,7 @@ body.metro-open { padding-bottom: 260px; }
   padding: 10px 6px 4px;
   margin: 12px 0 6px;
 }
-.tab { display: block; width: 100%; min-width: 640px; max-width: 980px; height: auto; font-family: var(--ui); }
+svg.tab { display: block; width: 100%; min-width: 640px; max-width: 980px; height: auto; font-family: var(--ui); }
 .tab-line { stroke: var(--ink-soft); stroke-width: 0.8; opacity: 0.6; }
 .tab-bar { stroke: var(--ink); stroke-width: 1.2; }
 .tab-string { font-size: 9px; fill: var(--ink-soft); text-anchor: end; }
@@ -1054,3 +1054,6 @@ h3 { font-size: 1.05rem; margin: 18px 0 6px; }
 .progressions .disclosure-label { font-weight: 400; }
 .progressions .disclosure > summary:hover .disclosure-label { text-decoration: none; }
 .progressions .disclosure > summary:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.caged-chords .voicing-grid button { gap: 1px; }
+.caged-chords .shape-name { font-weight: 800; font-size: 0.95rem; }
+.voicing-grid .tab { white-space: nowrap; letter-spacing: 0; font-size: 0.8rem; }

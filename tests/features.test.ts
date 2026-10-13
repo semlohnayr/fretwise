@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   n, pc, noteName, TUNINGS, stringMidis, threeNps, scaleById, chordVoicings, voicingName, chordNotes, chordById,
   capoOptions, translateCapo, keyLabel, seeded, noteFindQuestion, fretIntervalQuestion, earIntervalQuestion,
+  cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS,
   chordQuizQuestion, fretPc, BASIC_INTERVALS, parseTuning,
 } from '../src/theory';
 import { renderString, midiToHz } from '../src/audio';
@@ -152,6 +153,45 @@ describe('string synth', () => {
     for (const m of [40, 52, 64, 76, 84]) {
       const f = estimate(renderString(48000, m, 0.5, rand), 48000, midiToHz(m));
       expect(Math.abs(1200 * Math.log2(f / midiToHz(m)))).toBeLessThan(5);
+    }
+  });
+});
+
+describe('CAGED chord shapes', () => {
+  const tones = (root: string, id: string) => chordNotes(n(root), chordById(id)).map(pc);
+
+  it('keeps the classic major and minor positions', () => {
+    expect(cagedChordShapes(n('C'), 'maj', 15).slice(0, 5).map((s) => s.name)).toEqual(['C', 'A', 'G', 'E', 'D']);
+    expect(cagedChordShapes(n('A'), 'min', 15)[0].frets).toEqual([null, 0, 2, 2, 1, 0]);
+  });
+
+  it('moves the open 7th shapes to any root', () => {
+    const c7 = cagedChordShapes(n('C'), '7', 15);
+    expect(c7.find((s) => s.name === 'C')!.frets).toEqual([null, 3, 2, 3, 1, 0]);
+    expect(c7.find((s) => s.name === 'A')!.frets).toEqual([null, 3, 5, 3, 5, 3]);
+    expect(c7.find((s) => s.name === 'E')!.frets).toEqual([8, 10, 8, 9, 8, 8]);
+    expect(cagedChordShapes(n('B'), 'm7b5', 15).find((s) => s.name === 'A')!.frets).toEqual([null, 2, 3, 2, 3, null]);
+  });
+
+  it('every shape for every root is playable and uses only chord tones, root in the bass', () => {
+    const roots = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+    for (const id of CAGED_CHORD_IDS) {
+      expect(Object.keys(CAGED_CHORDS[id]).length).toBeGreaterThanOrEqual(2);
+      for (const root of roots) {
+        const t = tones(root, id);
+        const shapes = cagedChordShapes(n(root), id, 17);
+        // Each defined shape fits somewhere below fret 17.
+        expect(new Set(shapes.map((s) => s.name)).size).toBe(Object.keys(CAGED_CHORDS[id]).length);
+        for (const sh of shapes) {
+          const played = sh.frets.map((f, s) => (f === null ? null : t.indexOf(fretPc(std, s, f))));
+          played.forEach((x) => expect(x).not.toBe(-1));
+          expect(played.find((x) => x !== null)).toBe(0);
+          // Root, 3rd (or its sus/♭ replacement) and the 7th or 6th are always present; only the 5th may be left out.
+          t.forEach((_, i) => i !== 2 && expect(played).toContain(i));
+          const fretted = sh.frets.filter((f): f is number => f !== null && f > 0);
+          if (fretted.length) expect(Math.max(...fretted) - Math.min(...fretted)).toBeLessThanOrEqual(4);
+        }
+      }
     }
   });
 });

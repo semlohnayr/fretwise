@@ -1,7 +1,7 @@
 import {
   type Interval, type Note, type Tuning, type CagedShape, type TriadVoicing, type NpsPosition, type Voicing,
   SCALES, CHORDS, TUNINGS, scaleById, chordById, scaleNotes, chordNotes, chordSymbol,
-  noteName, pc, fretPc, isStandard, parseTuning, cagedShapes, triadVoicings, threeNps,
+  noteName, pc, fretPc, isStandard, parseTuning, cagedShapes, cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS, CAGED_ORDER, triadVoicings, threeNps,
   chordVoicings, voicingName, stringMidis,
   INVERSION_NAMES, intervalLabel, intervalName, tuningLabel,
 } from '../theory';
@@ -69,8 +69,9 @@ function resolve(st: State): Resolved {
     const label = proper ? scale.name : scale.name[0].toLowerCase() + scale.name.slice(1);
     return build(`${noteName(st.root)} ${label}`, scaleNotes(st.root, scale), scale.formula, scale.blurb);
   }
-  if (st.fretMode === 'chord' || st.fretMode === 'triads') {
-    const chord = chordById(st.fretMode === 'triads' && !TRIAD_IDS.includes(st.chordId) ? 'maj' : st.chordId);
+  if (st.fretMode === 'chord' || st.fretMode === 'triads' || st.fretMode === 'caged') {
+    const id = st.fretMode === 'triads' ? (TRIAD_IDS.includes(st.chordId) ? st.chordId : 'maj') : st.fretMode === 'caged' ? cagedChordId(st) : st.chordId;
+    const chord = chordById(id);
     return build(`${chordSymbol(st.root, chord)} (${chord.name.toLowerCase()})`, chordNotes(st.root, chord), chord.formula, chord.blurb);
   }
   // Notes mode: just the chosen note, everywhere.
@@ -81,6 +82,14 @@ function resolve(st: State): Resolved {
     'Learn where each note lives: find it on every string, then use octave shapes (two strings and two frets over, or three strings and three frets over) to jump between them.',
   );
 }
+
+/** Chord type shown in CAGED chords mode: the current chord if it has CAGED shapes, else major. */
+export function cagedChordId(st: State): string {
+  return CAGED_CHORD_IDS.includes(st.chordId) ? st.chordId : 'maj';
+}
+
+/** Chord views (Chord and CAGED chords) share grips, strumming and the CAGED overlay. */
+const isChordView = (st: State) => st.fretMode === 'chord' || st.fretMode === 'caged';
 
 /* ---------- Geometry ---------- */
 
@@ -255,11 +264,15 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
   const modeOpts: { value: FretMode; label: string }[] = [
     { value: 'scale', label: 'Scale' },
     { value: 'chord', label: 'Chord' },
+    { value: 'caged', label: 'CAGED chords' },
     { value: 'triads', label: 'Triads' },
     { value: 'notes', label: 'Find a note' },
   ];
-  const cagedOk = standard && !!r.cagedQuality && (st.fretMode === 'scale' || st.fretMode === 'chord');
-  const cagedTitle = !standard ? 'CAGED is defined for standard tuning' : !r.cagedQuality ? 'CAGED needs a major or minor sound' : undefined;
+  const hasShapes = st.fretMode === 'chord' ? !!CAGED_CHORDS[st.chordId] : !!r.cagedQuality;
+  const cagedOk = standard && hasShapes && (st.fretMode === 'scale' || st.fretMode === 'chord');
+  const cagedTitle = !standard ? 'CAGED is defined for standard tuning' : !hasShapes ? (st.fretMode === 'chord' ? 'No CAGED shapes for this chord type' : 'CAGED needs a major or minor sound') : undefined;
+  const cagedId = cagedChordId(st);
+  const available = CAGED_CHORDS[cagedId] ?? {};
   const npsOk = st.fretMode === 'scale' && r.notes.length === 7;
   const pattern = effectivePattern(st, tn, r);
   const patternOpts: { value: Pattern; label: string; disabled?: boolean; title?: string }[] = [
@@ -287,6 +300,17 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
       st.fretMode === 'chord'
         ? select('Chord', st.chordId, CHORDS.map((c) => ({ value: c.id, label: `${c.name} (${noteName(st.root)}${c.symbol})` })), (chordId) => setState({ chordId }))
         : null,
+      st.fretMode === 'caged'
+        ? select('Chord', cagedId, CHORDS.filter((c) => CAGED_CHORD_IDS.includes(c.id)).map((c) => ({ value: c.id, label: `${c.name} (${noteName(st.root)}${c.symbol})` })), (chordId) => setState({ chordId, caged: 'all' }))
+        : null,
+      st.fretMode === 'caged' && standard
+        ? segmented('Shape', st.caged in available || st.caged === 'all' ? st.caged : 'all', (['all', ...CAGED_ORDER] as const).map((v) => ({
+            value: v,
+            label: v === 'all' ? 'All' : v,
+            disabled: v !== 'all' && !(v in available),
+            title: v !== 'all' && !(v in available) ? `No common ${v} shape for this chord` : undefined,
+          })), (caged) => setState({ caged }))
+        : null,
       st.fretMode === 'triads'
         ? select('Triad', TRIAD_IDS.includes(st.chordId) ? st.chordId : 'maj', CHORDS.filter((c) => TRIAD_IDS.includes(c.id)).map((c) => ({ value: c.id, label: c.name })), (chordId) => setState({ chordId }))
         : null,
@@ -296,7 +320,7 @@ function controls(st: State, tn: Tuning, tuningError: string | undefined, r: Res
       st.fretMode === 'scale' || st.fretMode === 'chord'
         ? segmented('Pattern', pattern, patternOpts, (p) => setState({ pattern: p, voicing: null }))
         : null,
-      pattern === 'caged'
+      pattern === 'caged' && st.fretMode !== 'caged'
         ? segmented('Shape', st.caged, (['all', 'C', 'A', 'G', 'E', 'D'] as const).map((v) => ({ value: v, label: v === 'all' ? 'All' : v })), (caged) => setState({ caged }))
         : null,
       pattern === '3nps'
@@ -342,9 +366,9 @@ function info(st: State, r: Resolved, voicings: TriadVoicing[], cagedActive: boo
     );
   }
   if (cagedActive) {
-    const order = shapes.slice(0, 5).map((x) => x.name).join(' → ');
+    const order = firstOfEachShape(shapes).map((x) => x.name).join(' → ');
     explain.push(
-      h('p', {}, `CAGED links the five open chord shapes (C, A, G, E and D) into a chain that covers the whole neck. Moved up to ${noteName(st.root)}, they run ${order} from the nut upward, each sharing notes with the next.`),
+      h('p', {}, `CAGED links the five open chord shapes (C, A, G, E and D) into a chain that covers the whole neck. Moved up to ${noteName(st.root)}, they run ${order} from the nut upward, each sharing notes with the next. The same chain works for 7ths, 6ths and other chords: each is a small change to the major or minor shape it grows from.`),
       h('p', {}, st.fretMode === 'scale'
         ? 'Each colored box is one scale position built around a chord shape. Learn the chord shape first, then the scale notes that surround it.'
         : 'Ringed notes are the chord grip itself. The other chord tones in the box are there to find alternative voicings.'),
@@ -395,7 +419,11 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
   const opens = stringMidis(tn);
   const pattern = effectivePattern(st, tn, r);
   const cagedActive = pattern === 'caged';
-  const shapes = cagedActive ? cagedShapes(st.root, r.cagedQuality!, st.frets) : [];
+  const shapes = !cagedActive
+    ? []
+    : isChordView(st)
+      ? cagedChordShapes(st.root, st.fretMode === 'caged' ? cagedChordId(st) : st.chordId, st.frets)
+      : cagedShapes(st.root, r.cagedQuality!, st.frets);
   const focusShapes = cagedActive && st.caged !== 'all' ? shapes.filter((x) => x.name === st.caged) : [];
   const npsAll = pattern === '3nps' ? threeNps(tn, pc(st.root), r.intervals.map((i) => i.semitones), st.frets) : [];
   const nps = npsAll.find((p) => p.number === st.npsPosition);
@@ -420,7 +448,7 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     const dots = s('g', { class: 'dots' });
     // Grip frets for ringed chord tones when a single CAGED shape is focused.
     const grip = new Set<string>();
-    if (st.fretMode === 'chord') focusShapes.forEach((sh) => sh.frets.forEach((f, i) => f !== null && grip.add(`${i}:${f}`)));
+    if (isChordView(st)) focusShapes.forEach((sh) => sh.frets.forEach((f, i) => f !== null && grip.add(`${i}:${f}`)));
     const chosenSet = new Set<string>();
     chosen?.frets.forEach((f, i) => f !== null && chosenSet.add(`${i}:${f}`));
     tn.strings.forEach((_, str) => {
@@ -478,7 +506,12 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
       const run = focused ?? scaleMidis(pc(st.root), semis);
       playSequence([...run, ...[...run].reverse().slice(1)], 0.22);
     });
-  } else if (st.fretMode === 'chord') {
+  } else if (st.fretMode === 'caged' && cagedActive && !focusShapes.length) {
+    const firsts = firstOfEachShape(shapes);
+    play = playButton(`Play all ${firsts.length}`, () =>
+      playProgression(firsts.map((sh) => sh.frets.flatMap((f, i) => (f === null ? [] : [opens[i] + f]))), 1.1),
+    );
+  } else if (isChordView(st)) {
     const grip = chosen ?? (focusShapes[0] ? { frets: focusShapes[0].frets } : library[0]);
     play = playButton('Strum', () =>
       playChord(grip ? grip.frets.flatMap((f, i) => (f === null ? [] : [opens[i] + f])) : chordMidis(pc(st.root), semis)),
@@ -495,13 +528,97 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     neckFoot(st),
     info(st, r, voicings, cagedActive, shapes, nps, play),
     ...(st.fretMode === 'chord' ? [voicingLibrary(r, tn, library, chosen, opens)] : []),
+    ...(st.fretMode === 'caged' ? [cagedSection(st, r, tn, shapes, opens)] : []),
+  );
+}
+
+/* ---------- CAGED chords ---------- */
+
+/** What each chord type's CAGED shapes are, in one line. */
+const CAGED_TYPE_NOTES: Record<string, string> = {
+  maj: 'The five open major chords (C, A, G, E and D), moved up the neck with a barre or the index finger standing in for the nut.',
+  min: 'The major shapes with each 3rd lowered a half step. The G and C minor shapes are awkward; most players use the E, A and D forms.',
+  '7': 'Each major shape with one note moved to the ♭7, a whole step below the root. The E and A forms are the workhorse barre 7ths of blues and bluegrass.',
+  maj7: 'Each major shape with one note moved to the 7th, a half step below the root. Lush and open; the A and D forms are the most used.',
+  m7: 'The minor shapes with one note moved to the ♭7. There is no common G form; the E and A barre forms cover most music.',
+  '6': 'The major shapes plus the 6th. A sweet, vintage sound for western swing and old-time endings.',
+  m6: 'Minor triad plus a major 6th: the Dorian sound. Common in the E, A and D forms.',
+  sus4: 'The 3rd replaced by the 4th, usually resolving back down to the major shape you started from.',
+  sus2: 'The 3rd replaced by the 2nd. Open and ringing; no common E form.',
+  add9: 'The major shape with the 9th added on top or in the middle. The C form is the familiar Cadd9.',
+  '9': 'A dominant 7th with the 9th added. Only two shapes are in common use: the C form (the classic funk "9 chord") and the E form.',
+  m7b5: 'Half-diminished: the ii chord of a minor key. Played in the A, E and D forms, usually without the outer strings.',
+  dim7: 'Stacked minor 3rds, so every shape repeats every three frets. The A, E and D forms cover the whole neck.',
+};
+
+/** Lowest instance of each shape, in neck order: the CAGED cycle as you climb the neck. */
+function firstOfEachShape(shapes: CagedShape[]): CagedShape[] {
+  const seen = new Set<string>();
+  return shapes.filter((sh) => (seen.has(sh.name) ? false : (seen.add(sh.name), true)));
+}
+
+/** A CAGED shape as a chord-diagram voicing (with a barre where the index finger covers several strings). */
+function shapeVoicing(tn: Tuning, sh: CagedShape, tonePcs: number[]): Voicing {
+  const tones = sh.frets.map((f, s) => (f === null ? null : tonePcs.indexOf(fretPc(tn, s, f))));
+  const fretted = sh.frets.filter((f): f is number => f !== null && f > 0);
+  const minF = fretted.length ? Math.min(...fretted) : 0;
+  const atMin = sh.frets.map((f, i) => (f === minF && minF > 0 ? i : -1)).filter((i) => i >= 0);
+  let barre: Voicing['barre'];
+  if (atMin.length >= 2 && !sh.frets.slice(atMin[0], atMin[atMin.length - 1] + 1).some((f) => f === 0)) {
+    barre = { fret: minF, from: atMin[0], to: atMin[atMin.length - 1] };
+  }
+  return { frets: sh.frets, tones, baseFret: Math.max(1, minF), barre, fingers: fretted.length, omitsFifth: false };
+}
+
+function cagedSection(st: State, r: Resolved, tn: Tuning, shapes: CagedShape[], opens: number[]): HTMLElement {
+  if (!isStandard(tn)) {
+    return h('section', { class: 'voicings' }, h('p', { class: 'error' }, 'CAGED shapes are built on standard tuning. Switch Neck settings back to standard tuning to see them.'));
+  }
+  const id = cagedChordId(st);
+  const chord = chordById(id);
+  const firsts = firstOfEachShape(shapes);
+  const tonePcs = r.notes.map(pc);
+  const missing = CAGED_ORDER.filter((name) => !(name in (CAGED_CHORDS[id] ?? {})));
+  return h(
+    'section',
+    { class: 'voicings caged-chords' },
+    h('div', { class: 'h3-row' }, h('h3', {}, `The ${firsts.length} ${chordSymbol(st.root, chord)} shapes, low to high`)),
+    h('p', { class: 'hint' }, CAGED_TYPE_NOTES[id] ?? '', missing.length ? ` No common ${missing.join(' or ')} form.` : ''),
+    h(
+      'ol',
+      { class: 'voicing-grid' },
+      ...firsts.map((sh) => {
+        const v = shapeVoicing(tn, sh, tonePcs);
+        const on = st.caged === sh.name;
+        return h('li', {},
+          h('button', {
+            type: 'button',
+            class: on ? 'on' : '',
+            'aria-pressed': String(on),
+            'aria-label': `${sh.name} shape at fret ${sh.minFret}, ${voicingName(v)}`,
+            onclick: () => {
+              playChord(sh.frets.flatMap((f, i) => (f === null ? [] : [opens[i] + f])));
+              setState({ caged: on ? 'all' : sh.name });
+            },
+          },
+          h('span', { class: 'shape-name' }, `${sh.name} shape`),
+          chordDiagram(v, r.intervals, tn.strings.length),
+          h('span', { class: 'tab' }, voicingName(v)),
+          h('small', {}, sh.minFret === 0 ? 'Open position' : `Fret ${sh.minFret}`)));
+      }),
+    ),
+    h('p', { class: 'hint' }, 'Tap a shape to hear it and light it up on the neck; tap it again to see all of them.'),
   );
 }
 
 /** Pattern actually in effect: falls back to none when the selection can't use it. */
 function effectivePattern(st: State, tn: Tuning, r: Resolved): Pattern {
+  if (st.fretMode === 'caged') return isStandard(tn) ? 'caged' : 'none';
   if (st.fretMode !== 'scale' && st.fretMode !== 'chord') return 'none';
-  if (st.pattern === 'caged') return isStandard(tn) && r.cagedQuality ? 'caged' : 'none';
+  if (st.pattern === 'caged') {
+    const has = st.fretMode === 'chord' ? !!CAGED_CHORDS[st.chordId] : !!r.cagedQuality;
+    return isStandard(tn) && has ? 'caged' : 'none';
+  }
   if (st.pattern === '3nps') return st.fretMode === 'scale' && r.notes.length === 7 ? '3nps' : 'none';
   return 'none';
 }
