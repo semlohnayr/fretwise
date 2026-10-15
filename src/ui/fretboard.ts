@@ -582,7 +582,9 @@ function cagedSection(st: State, r: Resolved, tn: Tuning, shapes: CagedShape[], 
   return h(
     'section',
     { class: 'voicings caged-chords' },
-    h('div', { class: 'h3-row' }, h('h3', {}, `The ${firsts.length} ${chordSymbol(st.root, chord)} shapes, low to high`)),
+    h('div', { class: 'h3-row' },
+      h('h3', {}, `The ${firsts.length} ${chordSymbol(st.root, chord)} shapes, low to high`),
+      h('button', { type: 'button', class: 'chip', onclick: () => setState({ view: 'shapes' }) }, 'Chord chart of every shape')),
     h('p', { class: 'hint' }, CAGED_TYPE_NOTES[id] ?? '', missing.length ? ` No common ${missing.join(' or ')} form.` : ''),
     h(
       'ol',

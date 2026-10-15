@@ -1,6 +1,6 @@
 import { type Note, n, noteName, SCALES, CHORDS } from './theory';
 
-export type View = 'circle' | 'fretboard' | 'modes' | 'melody' | 'capo' | 'practice' | 'sessions';
+export type View = 'circle' | 'fretboard' | 'modes' | 'shapes' | 'melody' | 'capo' | 'practice' | 'sessions';
 export type Pattern = 'none' | 'caged' | '3nps';
 export type QuizKind = 'note' | 'fret-interval' | 'ear-interval' | 'ear-chord';
 export type MelodyTab = 'warmups' | 'tunes' | 'licks' | 'random' | 'changes';
@@ -106,7 +106,7 @@ export function fromHash(): Partial<State> {
   const [view, query = ''] = location.hash.replace(/^#/, '').split('?');
   const p = new URLSearchParams(query);
   const out: Partial<State> = {};
-  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'melody' || view === 'capo' || view === 'practice' || view === 'sessions') out.view = view;
+  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'shapes' || view === 'melody' || view === 'capo' || view === 'practice' || view === 'sessions') out.view = view;
   try {
     if (p.get('root')) out.root = n(p.get('root')!);
   } catch {

@@ -94,8 +94,11 @@ export const CAGED_CHORDS: Record<string, Partial<Record<CagedName, ShapeTemplat
   dim7: { A: grip(1, 'x3424x'), E: grip(0, '012020'), D: grip(2, 'xx0101') },
 };
 
-/** Chord types (ids from CHORDS) that have CAGED shapes. */
-export const CAGED_CHORD_IDS = Object.keys(CAGED_CHORDS);
+/**
+ * Chord types (ids from CHORDS) that have CAGED shapes, in teaching order.
+ * (Spelled out because JavaScript lists numeric-looking keys such as '7' first.)
+ */
+export const CAGED_CHORD_IDS = ['maj', 'min', '7', 'maj7', 'm7', '6', 'm6', 'sus4', 'sus2', 'add9', '9', 'm7b5', 'dim7'];
 
 export interface CagedShape {
   name: CagedName;
@@ -246,4 +249,40 @@ export function threeNps(tn: Tuning, rootPc: number, scaleSemis: number[], maxFr
     }
   }
   return out;
+}
+
+/* ---------------- Movable shapes (key-free) ---------------- */
+
+export interface MovableNote {
+  /** String index, 0 = low E. */
+  string: number;
+  /** Frets above (+) or below (−) the root's fret. */
+  rel: number;
+  /** Semitones above the root (0–11). */
+  semitones: number;
+}
+
+export interface MovableShape {
+  /** String that carries the root the shape is named and moved by. */
+  ref: number;
+  notes: MovableNote[];
+  /** Lowest and highest relative fret used. */
+  lo: number;
+  hi: number;
+  /** Strings not played. */
+  muted: number[];
+}
+
+/** A CAGED chord shape with no key attached: where each note sits relative to the root. */
+export function movableShape(chordId: string, name: CagedName): MovableShape | null {
+  const tpl = CAGED_CHORDS[chordId]?.[name];
+  if (!tpl) return null;
+  const notes: MovableNote[] = [];
+  const muted: number[] = [];
+  tpl.offsets.forEach((rel, s) => {
+    if (rel === null) muted.push(s);
+    else notes.push({ string: s, rel, semitones: mod(STANDARD_PCS[s] + rel - STANDARD_PCS[tpl.ref], 12) });
+  });
+  const rels = notes.map((x) => x.rel);
+  return { ref: tpl.ref, notes, lo: Math.min(...rels), hi: Math.max(...rels), muted };
 }

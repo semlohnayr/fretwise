@@ -4,6 +4,7 @@ import { renderFretboard } from './ui/fretboard';
 import { renderModes } from './ui/modes';
 import { renderCapo } from './ui/capo';
 import { renderMelody } from './ui/melody';
+import { renderShapes } from './ui/shapes';
 import { renderSessions } from './ui/sessions';
 import { initSessionBar } from './ui/sessionbar';
 import { renderPractice } from './ui/practice';
@@ -23,6 +24,7 @@ const NAV: { group: string; views: { id: View; label: string; title: string }[] 
       { id: 'circle', label: 'Circle', title: 'Circle of fifths, keys and chords' },
       { id: 'fretboard', label: 'Fretboard', title: 'Scales, chords, triads and patterns on the neck' },
       { id: 'modes', label: 'Modes', title: 'The seven modes compared' },
+      { id: 'shapes', label: 'Chord chart', title: 'Every movable CAGED chord shape on one printable page' },
       { id: 'capo', label: 'Capo', title: 'Capo calculator' },
     ],
   },
@@ -77,6 +79,7 @@ function render(st: State): void {
   else if (st.view === 'fretboard') renderFretboard(main, st);
   else if (st.view === 'modes') renderModes(main, st);
   else if (st.view === 'melody') renderMelody(main, st);
+  else if (st.view === 'shapes') renderShapes(main);
   else if (st.view === 'capo') renderCapo(main, st);
   else if (st.view === 'sessions') renderSessions(main, st);
   else renderPractice(main, st);

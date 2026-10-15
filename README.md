@@ -22,6 +22,9 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - Tunings: standard, half step down, drop D, double drop D, DADGAD, open G/D/E/C, drop C, or a custom tuning with 3 to 9 strings (handy for bass, 7-strings, mandolin-style setups).
 - 12 to 24 frets; the neck scrolls horizontally on small screens.
 
+**Chord chart**
+- A static page with every movable CAGED shape for all 13 chord types (major through dim7), one row per chord type and one column per shape. Dots are labelled by interval and R marks the root, so you slide a shape until R sits on the root you want. It has a Print button and a print layout.
+
 **Sound**
 - A built-in plucked-string synth (Karplus–Strong, no samples). Select any note on the neck to hear it; play scales, positions, chords, triads, every chord in a key, progressions, and modes over a drone.
 - The Sound button in the header mutes everything and remembers your choice.
@@ -120,6 +123,7 @@ src/
     circle.ts      Circle of fifths view
     fretboard.ts   Fretboard view
     modes.ts       Modes view
+    shapes.ts      Chord chart page (movable CAGED shapes)
     capo.ts        Capo view
     practice.ts    Practice quizzes
     metronome.ts   Metronome dock

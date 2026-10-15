@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   n, pc, noteName, TUNINGS, stringMidis, threeNps, scaleById, chordVoicings, voicingName, chordNotes, chordById,
   capoOptions, translateCapo, keyLabel, seeded, noteFindQuestion, fretIntervalQuestion, earIntervalQuestion,
-  cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS,
+  cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS, movableShape,
   chordQuizQuestion, fretPc, BASIC_INTERVALS, parseTuning,
 } from '../src/theory';
 import { renderString, midiToHz } from '../src/audio';
@@ -193,5 +193,35 @@ describe('CAGED chord shapes', () => {
         }
       }
     }
+  });
+});
+
+describe('movable chord chart shapes', () => {
+  it('describes each shape relative to its root', () => {
+    const e7 = movableShape('7', 'E')!;
+    expect(e7.ref).toBe(0);
+    expect(e7.notes.map((x) => x.semitones)).toEqual([0, 7, 10, 4, 7, 0]);
+    expect([e7.lo, e7.hi]).toEqual([0, 2]);
+    const c = movableShape('maj', 'C')!;
+    expect(c.muted).toEqual([0]);
+    expect(c.notes.map((x) => x.semitones)).toEqual([0, 4, 7, 0, 4]);
+    expect([c.lo, c.hi]).toEqual([-3, 0]);
+    expect(movableShape('m7', 'G')).toBeNull();
+  });
+
+  it('only contains notes of the chord', () => {
+    for (const id of CAGED_CHORD_IDS) {
+      const semis = new Set(chordById(id).formula.map((i) => i.semitones % 12));
+      for (const name of ['C', 'A', 'G', 'E', 'D'] as const) {
+        movableShape(id, name)?.notes.forEach((x) => expect(semis.has(x.semitones)).toBe(true));
+      }
+    }
+  });
+});
+
+describe('CAGED chord list', () => {
+  it('lists every chord type with shapes, starting with the triads', () => {
+    expect([...CAGED_CHORD_IDS].sort()).toEqual(Object.keys(CAGED_CHORDS).sort());
+    expect(CAGED_CHORD_IDS.slice(0, 3)).toEqual(['maj', 'min', '7']);
   });
 });
