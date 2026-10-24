@@ -2,7 +2,7 @@ import {
   type Note, n, noteName, pc, SHAPE_KEYS, capoOptions, translateCapo, keyLabel, keySignature, relativeMajor,
 } from '../theory';
 import { getState, setState, type State } from '../state';
-import { h, select, segmented } from './dom';
+import { h, select, segmented, pageTitle } from './dom';
 import { rootPicker, playButton } from './controls';
 import { playChord, chordMidis } from '../audio';
 import type { DiatonicChord } from '../theory';
@@ -22,7 +22,7 @@ function finder(st: State): HTMLElement {
   return h(
     'section',
     { class: 'capo-finder' },
-    h('h2', {}, 'Find a capo position'),
+    h('h3', { class: 'section-title' }, 'Find a capo position'),
     h('p', { class: 'lead' }, `Pick the key you need to sound in, such as a singer's key. Each card is an open-chord key you know and the fret to put the capo on.`),
     h(
       'div',
@@ -68,7 +68,7 @@ function translator(st: State): HTMLElement {
   return h(
     'section',
     { class: 'capo-translate' },
-    h('h2', {}, 'Translate chord shapes'),
+    h('h3', { class: 'section-title' }, 'Translate chord shapes'),
     h(
       'div',
       { class: 'controls' },
@@ -114,5 +114,5 @@ function explainer(): HTMLElement {
 }
 
 export function renderCapo(root: HTMLElement, st: State = getState()): void {
-  root.replaceChildren(h('div', { class: 'capo-layout' }, finder(st), translator(st)), explainer());
+  root.replaceChildren(pageTitle('Capo', 'Find where to put the capo for any key, and what your chord shapes sound like there.'), h('div', { class: 'capo-layout' }, finder(st), translator(st)), explainer());
 }

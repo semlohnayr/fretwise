@@ -3,7 +3,7 @@ import {
   noteName, intervalLabel, relativeMinor, pc,
 } from '../theory';
 import { getState, setState, type State } from '../state';
-import { h, segmented, disclosure } from './dom';
+import { h, segmented, disclosure, pageTitle } from './dom';
 import { degreeClass, noteRow, rootPicker, playButton } from './controls';
 import { playScaleWithDrone, scaleMidis } from '../audio';
 
@@ -44,7 +44,7 @@ function parallelGrid(st: State, selected: ModeInfo): HTMLElement {
       h(
         'tr',
         { class: mode.id === selected.id ? 'selected' : '' },
-        h('th', { scope: 'row' }, h('button', { type: 'button', onclick: () => setState({ scaleId: mode.id }) }, `${noteName(st.root)} ${mode.name}`)),
+        h('th', { scope: 'row' }, h('button', { type: 'button', onclick: () => setState({ scaleId: mode.id }) }, h('span', { class: 'mode-root' }, `${noteName(st.root)} `), mode.name)),
         ...cells,
       ),
     );
@@ -168,6 +168,7 @@ export function renderModes(root: HTMLElement, st: State = getState()): void {
       : rootPicker(parent, (p) => setState({ root: scaleNotes(p, scaleById('ionian'))[modeById(mode.id).degree - 1] }), 'Parent major key');
 
   root.replaceChildren(
+    pageTitle('Modes', 'The seven modes side by side: what changes, and how each one sounds.'),
     h(
       'div',
       { class: 'controls' },

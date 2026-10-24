@@ -4,7 +4,7 @@ import {
   noteName, pc, spellPc, stringMidis, tuningLabel,
 } from '../theory';
 import { getState, setState, type State, type QuizKind } from '../state';
-import { h, segmented, pageTabs } from './dom';
+import { h, segmented, pageTabs, pageTitle } from './dom';
 import { playButton } from './controls';
 import { getTuning, neckSvg } from './fretboard';
 import { playNote, playChord, playSequence, isMuted } from '../audio';
@@ -216,19 +216,31 @@ function answerButtons(kind: QuizKind, q: Question): HTMLElement {
   );
 }
 
+/** Scroll a quiz neck so its marked notes are in view (phones show only a few frets). */
+function showMarks(box: HTMLElement): HTMLElement {
+  requestAnimationFrame(() => {
+    const dots = [...box.querySelectorAll('.dot')].map((d) => d.getBoundingClientRect());
+    if (!dots.length) return;
+    const b = box.getBoundingClientRect();
+    const mid = (Math.min(...dots.map((r) => r.left)) + Math.max(...dots.map((r) => r.right))) / 2;
+    box.scrollLeft += mid - (b.left + b.width / 2);
+  });
+  return box;
+}
+
 function prompt(q: Question, st: State): HTMLElement {
   const { tuning } = getTuning(st);
   const frets = Math.min(settings.maxFret, st.frets);
   if (q.kind === 'note') {
     const reveal = picked !== null ? noteName(spellPc(q.answer)) : '?';
-    return h('div', { class: 'neck-scroll' }, neckSvg(tuning, Math.max(frets, 5), [{ string: q.string, fret: q.fret, cls: 'deg-1 root', label: reveal }]));
+    return showMarks(h('div', { class: 'neck-scroll' }, neckSvg(tuning, Math.max(frets, 5), [{ string: q.string, fret: q.fret, cls: 'deg-1 root', label: reveal }])));
   }
   if (q.kind === 'fret-interval') {
-    return h('div', { class: 'neck-scroll' },
+    return showMarks(h('div', { class: 'neck-scroll' },
       neckSvg(tuning, Math.max(frets, 5), [
         { string: q.low.string, fret: q.low.fret, cls: 'deg-1 root', label: '1' },
         { string: q.high.string, fret: q.high.fret, cls: 'deg-5', label: '2' },
-      ]));
+      ])));
   }
   return h('div', { class: 'ear-prompt' },
     playButton(autoPlayed ? 'Play again' : 'Play', () => playQuestion(q, st), 'big'),
@@ -264,6 +276,7 @@ export function renderPractice(root: HTMLElement, st: State = getState()): void 
   const isEar = kind === 'ear-interval' || kind === 'ear-chord';
 
   root.replaceChildren(
+    pageTitle('Quizzes', 'Learn the neck and train your ear, a question at a time.'),
     h('div', { class: 'controls' },
       h('div', { class: 'control-row' },
         pageTabs('Quiz', kind, QUIZZES, (quiz) => {

@@ -3,7 +3,7 @@ import {
   harmonize, scaleById, scaleNotes, MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, progressionChords, mod,
 } from '../theory';
 import { getState, setState, type State } from '../state';
-import { h, s, clickable, disclosure } from './dom';
+import { h, s, clickable, disclosure, pageTitle } from './dom';
 import { noteRow, playButton } from './controls';
 import { playChord, playProgression, playSequence, chordMidis, scaleMidis } from '../audio';
 import type { DiatonicChord } from '../theory';
@@ -247,8 +247,51 @@ function explainer(): HTMLElement {
   );
 }
 
+/* A first-visit panel pointing at the main things to do. Hidden for good once closed. */
+const WELCOME = 'fretwise:welcome-closed';
+let welcomeClosed = (() => {
+  try {
+    return localStorage.getItem(WELCOME) === '1';
+  } catch {
+    return false;
+  }
+})();
+
+function welcome(): HTMLElement | null {
+  if (welcomeClosed) return null;
+  const close = () => {
+    welcomeClosed = true;
+    try {
+      localStorage.setItem(WELCOME, '1');
+    } catch {
+      /* private mode: it stays closed for this visit */
+    }
+    setState({});
+  };
+  const go = (label: string, sub: string, patch: Parameters<typeof setState>[0]) =>
+    h('li', {}, h('button', { type: 'button', onclick: () => setState(patch) }, h('b', {}, label), h('small', {}, sub)));
+  return h(
+    'section',
+    { class: 'welcome', 'aria-label': 'Where to start' },
+    h('div', { class: 'welcome-head' },
+      h('h3', {}, 'New here? Pick a place to start'),
+      h('button', { type: 'button', class: 'welcome-close', 'aria-label': 'Close this panel', onclick: close }, '×')),
+    h(
+      'ul',
+      {},
+      go('Practice for 15 minutes', 'A timed plan walks you through warm-ups to ear training', { view: 'sessions' }),
+      go('Learn a fiddle tune', 'Tab, play-along and pick directions', { view: 'melody', melodyTab: 'tunes' }),
+      go('See a scale on the neck', 'Every note of any scale or chord, labelled', { view: 'fretboard', fretMode: 'scale' }),
+      go('Quiz yourself', 'Note names, intervals and ear training', { view: 'practice' }),
+    ),
+    h('p', { class: 'hint' }, 'Or stay here: the circle of fifths shows how every key relates, and it is the map the rest of the site uses.'),
+  );
+}
+
 export function renderCircle(root: HTMLElement, st: State = getState()): void {
   root.replaceChildren(
+    pageTitle('Circle of fifths', 'Every key, its signature and its chords. Select a key to explore it.'),
+    ...[welcome()].filter((x): x is HTMLElement => x !== null),
     h(
       'div',
       { class: 'circle-layout' },

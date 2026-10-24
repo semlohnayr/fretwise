@@ -15,7 +15,7 @@ import { getState, setState, type State } from '../state';
 import * as metro from '../metronome';
 import * as mic from '../mic';
 import { playNoteAt, isMuted } from '../audio';
-import { h, segmented, select, disclosure, pageTabs } from './dom';
+import { h, segmented, select, disclosure, pageTabs, pageTitle } from './dom';
 import { openSpeedTrainer } from './metronome';
 import { degreeClass, rootPicker } from './controls';
 import { getTuning, neckSvg, type NeckMark } from './fretboard';
@@ -832,6 +832,7 @@ export function renderMelody(root: HTMLElement, st: State = getState()): void {
   else if (tab === 'changes') body = changesTab(tn);
   else body = tunesTab(st, tn);
   root.replaceChildren(
+    pageTitle('Melody', 'Warm-ups, fiddle tunes, licks and improvising, with tab you can play along to.'),
     h('div', { class: 'controls' },
       h('div', { class: 'control-row' },
         pageTabs('Melody section', tab, [

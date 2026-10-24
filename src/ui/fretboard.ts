@@ -6,7 +6,7 @@ import {
   INVERSION_NAMES, intervalLabel, intervalName, tuningLabel,
 } from '../theory';
 import { getState, setState, type State, type FretMode, type Pattern } from '../state';
-import { h, s, select, segmented, disclosure } from './dom';
+import { h, s, select, segmented, disclosure, pageTitle } from './dom';
 import { degreeClass, noteRow, rootPicker, playButton } from './controls';
 import { playNote, playChord, playSequence, playProgression, scaleMidis, chordMidis } from '../audio';
 import { setTrack, guideTrack } from '../metronome';
@@ -523,8 +523,11 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
   }
 
   root.replaceChildren(
+    pageTitle('Fretboard', 'Scales, chords, triads and CAGED shapes on the neck. Tap any note to hear it.'),
     controls(st, tn, error, r),
-    h('div', { class: 'neck-scroll', tabindex: '0', 'aria-label': 'Fretboard, scroll horizontally' }, svg),
+    phoneLayout()
+      ? h('div', { class: 'neck-scroll upright-wrap' }, uprightNeck(svg))
+      : h('div', { class: 'neck-scroll', tabindex: '0', 'aria-label': 'Fretboard, scroll horizontally' }, svg),
     neckFoot(st),
     info(st, r, voicings, cagedActive, shapes, nps, play),
     ...(st.fretMode === 'chord' ? [voicingLibrary(r, tn, library, chosen, opens)] : []),
@@ -681,6 +684,33 @@ export interface NeckMark {
   fret: number;
   cls: string;
   label?: string;
+}
+
+/** Phones get an upright neck: nut at the top, low string on the left, like a chord diagram. */
+export const phoneLayout = (): boolean => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 600px)').matches;
+
+/**
+ * Turn a horizontal neck upright. Everything is rotated a quarter turn
+ * clockwise; dots and labels are turned back so their text stays level.
+ */
+export function uprightNeck(svg: SVGElement): SVGElement {
+  const [, , w, hgt] = (svg.getAttribute('viewBox') ?? '0 0 0 0').split(' ').map(Number);
+  const turn = s('g', { transform: `translate(${hgt} 0) rotate(90)` });
+  turn.append(...[...svg.childNodes]);
+  svg.append(turn);
+  svg.setAttribute('viewBox', `0 0 ${hgt} ${w}`);
+  svg.setAttribute('width', String(hgt));
+  svg.setAttribute('height', String(w));
+  svg.classList.add('upright');
+  svg.querySelectorAll<SVGGElement>('g.dot').forEach((d) => d.setAttribute('transform', `${d.getAttribute('transform') ?? ''} rotate(-90)`));
+  svg.querySelectorAll<SVGTextElement>('text.open-name, text.fret-num').forEach((el) => {
+    const x = Number(el.getAttribute('x'));
+    const y = Number(el.getAttribute('y')) - 4;
+    el.setAttribute('y', String(y));
+    el.setAttribute('transform', `rotate(-90 ${x} ${y})`);
+    el.setAttribute('dominant-baseline', 'central');
+  });
+  return svg;
 }
 
 /** A plain neck with arbitrary marks, used by the practice quizzes. */
