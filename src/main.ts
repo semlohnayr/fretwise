@@ -45,6 +45,31 @@ const main = document.querySelector<HTMLElement>('#main')!;
 
 let lastView: View | null = null;
 
+/* On phones the page list folds into a menu button that shows the current page. */
+const headerEl = document.querySelector<HTMLElement>('header.top')!;
+const pagesToggle = document.querySelector<HTMLButtonElement>('#pages-toggle')!;
+const svgIcon = (d: string, cls: string) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  el.setAttribute('viewBox', '0 0 16 16');
+  el.setAttribute('aria-hidden', 'true');
+  el.setAttribute('class', cls);
+  el.innerHTML = `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return el;
+};
+const menuIcon = () => svgIcon('M2.5 4h11M2.5 8h11M2.5 12h11', 'menu-icon');
+const chevron = () => svgIcon('M4.5 6.5 8 10l3.5-3.5', 'chevron');
+function setMenu(open: boolean): void {
+  headerEl.classList.toggle('pages-open', open);
+  pagesToggle.setAttribute('aria-expanded', String(open));
+}
+pagesToggle.addEventListener('click', () => setMenu(!headerEl.classList.contains('pages-open')));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && headerEl.classList.contains('pages-open')) {
+    setMenu(false);
+    pagesToggle.focus();
+  }
+});
+
 function render(st: State): void {
   nav.replaceChildren(
     ...NAV.map((g) => {
@@ -52,14 +77,25 @@ function render(st: State): void {
       group.className = 'nav-group';
       group.setAttribute('role', 'group');
       group.setAttribute('aria-label', g.group);
+      // Group names and descriptions show only in the phone menu.
+      const name = document.createElement('span');
+      name.className = 'nav-group-name';
+      name.textContent = g.group;
+      name.setAttribute('aria-hidden', 'true');
+      group.append(name);
       for (const v of g.views) {
         const a = document.createElement('a');
         a.href = `#${v.id}`;
-        a.textContent = v.label;
+        const label = document.createElement('span');
+        label.textContent = v.label;
+        const desc = document.createElement('small');
+        desc.textContent = v.title;
+        a.append(label, desc);
         a.title = v.title;
         if (v.id === st.view) a.setAttribute('aria-current', 'page');
         a.addEventListener('click', (e) => {
           e.preventDefault();
+          setMenu(false);
           setState({ view: v.id });
         });
         group.append(a);
@@ -67,6 +103,9 @@ function render(st: State): void {
       return group;
     }),
   );
+  const current = NAV.flatMap((g) => g.views).find((v) => v.id === st.view);
+  pagesToggle.replaceChildren(menuIcon(), document.createTextNode(current?.label ?? 'Pages'), chevron());
+  pagesToggle.setAttribute('aria-label', `Pages menu, now on ${current?.label ?? 'a page'}`);
   // Keep the current page's link in view when the nav scrolls sideways on a phone.
   nav.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
@@ -121,6 +160,8 @@ onMuteChange((m) => {
 initMetronome();
 initSessionBar();
 subscribe(render);
+// Rotating a phone or resizing across the phone breakpoint switches the neck between upright and level.
+matchMedia('(max-width: 600px)').addEventListener('change', () => render(getState()));
 // Pasted or edited links (and back/forward) update the app without a reload.
 window.addEventListener('hashchange', () => setState(fromHash()));
 render(getState());

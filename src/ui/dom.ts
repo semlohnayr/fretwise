@@ -138,3 +138,8 @@ export function pageTabs<T extends string>(label: string, value: T, options: { v
   el.classList.add('page-tabs');
   return el;
 }
+
+/** The heading every page starts with: its name and one line on what it is for. */
+export function pageTitle(title: string, sub: string): HTMLElement {
+  return h('header', { class: 'page-title' }, h('h2', {}, title), h('p', {}, sub));
+}

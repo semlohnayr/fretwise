@@ -205,6 +205,11 @@ export function setOpen(v: boolean): void {
 
 export function initMetronome(): void {
   dock = document.querySelector('#metronome');
+  // The page leaves room for the dock at whatever height it currently is, so it never covers content.
+  if (dock && typeof ResizeObserver !== 'undefined') {
+    const d = dock;
+    new ResizeObserver(() => document.body.style.setProperty('--dock-h', `${d.offsetHeight}px`)).observe(d);
+  }
   document.querySelector('#metro-toggle')?.addEventListener('click', () => setOpen(!open));
   metro.onChange(render);
   metro.onTick(onTick);

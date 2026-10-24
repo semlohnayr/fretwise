@@ -10,9 +10,9 @@ import {
   arpeggioBox, bassLine, MAJOR_PROGRESSIONS, MINOR_PROGRESSIONS, progressionChords, autoTab,
 } from '../theory';
 import { type State, getState, setState } from '../state';
-import { h, s, select, segmented, pageTabs, disclosure } from './dom';
+import { h, s, select, segmented, pageTabs, disclosure, pageTitle } from './dom';
 import { rootPicker, playButton, degreeClass, noteRow } from './controls';
-import { neckSvg, chordDiagram, type NeckMark } from './fretboard';
+import { neckSvg, chordDiagram, phoneLayout, uprightNeck, type NeckMark } from './fretboard';
 import { tabSvg, type TabNote } from './tab';
 import { playChord, playNote, playNoteAt, playSequence } from '../audio';
 import * as metro from '../metronome';
@@ -86,6 +86,7 @@ function neck(tn: Tuning, c: Content, st: State, o: NeckOpts): HTMLElement {
     el.append(s('title', {}, `${noteName(m.note)}, ${intervalName(m.interval)} (${stringName(tn, str)} string, fret ${f})`));
     el.addEventListener('click', () => playNote(opens[str] + f));
   });
+  if (phoneLayout()) return h('div', { class: 'neck-scroll inst-neck upright-wrap' }, uprightNeck(svg));
   return h('div', { class: 'neck-scroll inst-neck', tabindex: '0', 'aria-label': 'Neck, scroll horizontally' }, svg);
 }
 
@@ -419,7 +420,7 @@ function renderBass(st: State, c: Content): HTMLElement[] {
 export function renderInstruments(root: HTMLElement, st: State = getState()): void {
   const c = content(st);
   root.replaceChildren(
-    h('div', { class: 'title-row' }, h('h2', {}, 'Mandolin & bass')),
+    pageTitle('Mandolin & bass', 'Scales, chop chords, arpeggios and bass lines for two more fretted instruments.'),
     pageTabs('Instrument', st.instrument, [{ value: 'mandolin', label: 'Mandolin' }, { value: 'bass', label: 'Bass guitar' }], (instrument) => setState({ instrument, instGrip: null })),
     ...(st.instrument === 'mandolin' ? renderMandolin(st, c) : renderBass(st, c)),
   );

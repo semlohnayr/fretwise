@@ -893,11 +893,11 @@ h3 { font-size: 1.05rem; margin: 18px 0 6px; }
 .lead .meta { font-family: var(--ui); }
 .source { margin-top: 16px; }
 
-/* On phones, option groups scroll sideways instead of stacking into several lines. */
+/* Phones */
 @media (max-width: 600px) {
-  .segmented { flex-wrap: nowrap; overflow-x: auto; max-width: calc(100vw - 32px); scrollbar-width: none; }
-  .segmented::-webkit-scrollbar { display: none; }
-  .segmented button { white-space: nowrap; flex: none; }
+  /* Option groups wrap onto a second line rather than hiding options off the edge. */
+  .segmented { flex-wrap: wrap; max-width: calc(100vw - 32px); }
+  .segmented button { white-space: nowrap; }
   main { padding: 14px 16px 32px; }
   h2 { font-size: 1.4rem; }
 }
@@ -1119,3 +1119,98 @@ h3 { font-size: 1.05rem; margin: 18px 0 6px; }
 .bass-lines .h3-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
 .progression-line { font-weight: 600; margin: 6px 0; }
 .bass-tab svg.tab { width: 100%; max-width: 980px; height: auto; }
+
+/* ---------- Upright neck (phones) ---------- */
+.neck-scroll.upright-wrap { overflow: visible; padding: 10px 0; display: flex; justify-content: center; }
+.fretboard.upright .open-name, .fretboard.upright .fret-num { text-anchor: middle; }
+
+/* ---------- Phone page menu ---------- */
+#pages-toggle, .nav-group-name, #views a small { display: none; }
+@media (max-width: 760px) {
+  .top { grid-template-areas: 'brand metro sound' 'pages pages pages' 'nav nav nav'; }
+  #pages-toggle {
+    grid-area: pages; justify-self: stretch;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; min-height: 40px;
+    border: 1px solid #f3efe438; border-radius: 10px;
+    background: #ffffff10; color: var(--pearl);
+    font: inherit; font-weight: 700; text-align: left; cursor: pointer;
+  }
+  #pages-toggle svg { width: 18px; height: 18px; flex: none; }
+  #pages-toggle .chevron { margin-left: auto; transition: transform 0.15s; }
+  .pages-open #pages-toggle .chevron { transform: rotate(180deg); }
+  #views { display: none; mask-image: none; }
+  .pages-open #views {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; align-items: start;
+    overflow: visible; margin: 0; padding: 4px 0 8px;
+  }
+  .pages-open .nav-group { flex-direction: column; gap: 2px; padding: 0; border: 0; }
+  .pages-open .nav-group + .nav-group { padding-left: 0; border-left: 0; }
+  .pages-open .nav-group-name { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--pearl); opacity: 0.6; padding: 4px 10px; }
+  .pages-open #views a { display: block; white-space: normal; padding: 7px 10px; border-radius: 10px; opacity: 0.9; }
+  .pages-open #views a small { display: block; font-weight: 400; font-size: 0.75rem; opacity: 0.75; line-height: 1.3; margin-top: 1px; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) { #pages-toggle .chevron { transition: none; } }
+
+/* ---------- Phones: section tabs wrap, Modes table fits, one-row key picker ---------- */
+@media (max-width: 600px) {
+  .page-tabs .segmented { flex-wrap: wrap; overflow: visible; row-gap: 0; }
+  .page-tabs .segmented button { padding: 8px 10px 9px; }
+
+  .grid-scroll { overflow: visible; }
+  .mode-grid { border-spacing: 2px; table-layout: fixed; }
+  .mode-grid.parallel thead th:first-child { width: 4.6rem; }
+  .mode-grid.parallel th { font-size: 0.6rem; padding: 2px 0; letter-spacing: -0.02em; }
+  .mode-grid.parallel th[scope='row'] button { font-size: 0.78rem; padding: 6px 4px; overflow: hidden; text-overflow: ellipsis; }
+  .mode-grid.parallel .mode-root { display: none; }
+  .mode-grid.parallel td { min-width: 0; padding: 5px 0; font-size: 0.72rem; border-radius: 4px; }
+  .mode-grid.relative thead th:first-child { width: 6.4rem; }
+  .mode-grid.relative th { font-size: 0.66rem; }
+  .mode-grid.relative th[scope='row'] button { font-size: 0.8rem; padding: 6px 4px; overflow: hidden; text-overflow: ellipsis; }
+  .mode-grid.relative td { min-width: 0; padding: 4px 0; font-size: 0.78rem; }
+
+  /* All twelve keys on one row. */
+  .field:has(> .roots) { width: 100%; }
+  .roots { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px; width: 100%; max-width: calc(100vw - 32px); box-sizing: border-box; }
+  .roots button { min-width: 0; padding: 4px 0; min-height: 40px; font-size: 0.82rem; letter-spacing: -0.02em; }
+}
+
+/* ---------- Page titles ---------- */
+.page-title { margin: 0 0 14px; }
+.page-title h2 { margin: 0; }
+.page-title p { margin: 2px 0 0; color: var(--ink-soft); font-size: 0.95rem; max-width: 70ch; }
+.section-title { font-size: 1.25rem; margin: 0 0 6px; }
+/* On phones the page menu already describes each page, so the title stands alone. */
+@media (max-width: 600px) { .page-title { margin-bottom: 10px; } .page-title p { display: none; } }
+
+/* ---------- Bigger tap targets on touch screens ---------- */
+@media (pointer: coarse) {
+  .play.small { min-height: 36px; padding-inline: 12px; }
+  .play.mini, .capo-table .play.mini { width: 36px; height: 36px; }
+  .step-minutes .step { width: 36px; height: 36px; font-size: 1.1rem; }
+  main input[type='checkbox'] { width: 20px; height: 20px; }
+  .mode-grid th[scope='row'] button { min-height: 36px; }
+}
+
+/* ---------- First-visit panel ---------- */
+.welcome { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--deg-1); border-radius: var(--radius-m); padding: 12px 14px 8px; margin: 0 0 18px; }
+.welcome-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.welcome h3 { margin: 0; }
+.welcome-close { border: 0; background: none; color: var(--ink-soft); font-size: 1.5rem; line-height: 1; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; }
+.welcome-close:hover { background: var(--surface-2); color: var(--ink); }
+.welcome ul { list-style: none; padding: 0; margin: 10px 0 4px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.welcome li button { width: 100%; height: 100%; text-align: left; font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.welcome li button:hover { border-color: var(--ink-soft); }
+.welcome li small { color: var(--ink-soft); font-size: 0.8rem; }
+.welcome .hint { margin: 6px 0 4px; }
+@media (max-width: 600px) { .welcome ul { grid-template-columns: 1fr 1fr; } }
+
+/* Room for the metronome dock, measured from the dock itself. */
+body.metro-open { padding-bottom: calc(var(--dock-h, 260px) + 16px); }
+
+/* Phones: note answers in one row of seven (two rows of six for all twelve), so they sit right under the neck. */
+@media (max-width: 600px) {
+  .answers:has(> button:nth-child(7):last-child) { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .answers:has(> button:nth-child(12):last-child) { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+  .answers:has(> button:nth-child(7):last-child) button, .answers:has(> button:nth-child(12):last-child) button { min-width: 0; padding-inline: 0; }
+}

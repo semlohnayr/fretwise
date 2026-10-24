@@ -20,7 +20,7 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 - CAGED chords: the five CAGED shapes (where they are in common use) for major, minor, 7, maj7, m7, 6, m6, sus2, sus4, add9, 9, m7♭5 and dim7 in any key, as chord diagrams in neck order and on the neck. Tap a shape to hear it and see it in place; the CAGED overlay in Chord mode uses the same shapes.
 - Triads: close voicings on any three adjacent strings, connected and colored by inversion. Works in any tuning.
 - Tunings: standard, half step down, drop D, double drop D, DADGAD, open G/D/E/C, drop C, or a custom tuning with 3 to 9 strings (handy for bass, 7-strings, mandolin-style setups).
-- 12 to 24 frets; the neck scrolls horizontally on small screens.
+- 12 to 24 frets. On phones the neck stands upright (nut at the top, low string on the left, like a chord diagram) so the whole neck shows without sideways scrolling.
 
 **Chord chart**
 - A static page with every movable CAGED shape for all 13 chord types (major through dim7), one row per chord type and one column per shape. Dots are labelled by interval and R marks the root, so you slide a shape until R sits on the root you want. It has a Print button and a print layout.
