@@ -5,6 +5,7 @@ import { renderModes } from './ui/modes';
 import { renderCapo } from './ui/capo';
 import { renderMelody } from './ui/melody';
 import { renderShapes } from './ui/shapes';
+import { renderInstruments } from './ui/instruments';
 import { renderSessions } from './ui/sessions';
 import { initSessionBar } from './ui/sessionbar';
 import { renderPractice } from './ui/practice';
@@ -25,6 +26,7 @@ const NAV: { group: string; views: { id: View; label: string; title: string }[] 
       { id: 'fretboard', label: 'Fretboard', title: 'Scales, chords, triads and patterns on the neck' },
       { id: 'modes', label: 'Modes', title: 'The seven modes compared' },
       { id: 'shapes', label: 'Chord chart', title: 'Every movable CAGED chord shape on one printable page' },
+      { id: 'instruments', label: 'Mandolin & bass', title: 'Scales, chop chords, arpeggios and bass lines for mandolin and bass guitar' },
       { id: 'capo', label: 'Capo', title: 'Capo calculator' },
     ],
   },
@@ -74,12 +76,13 @@ function render(st: State): void {
   const neckScroll = scroller?.scrollLeft ?? 0;
 
   // Only the fretboard and melody pages supply something to play along with.
-  if (st.view !== 'fretboard' && st.view !== 'melody') setTrack(null);
+  if (st.view !== 'fretboard' && st.view !== 'melody' && st.view !== 'instruments') setTrack(null);
   if (st.view === 'circle') renderCircle(main, st);
   else if (st.view === 'fretboard') renderFretboard(main, st);
   else if (st.view === 'modes') renderModes(main, st);
   else if (st.view === 'melody') renderMelody(main, st);
   else if (st.view === 'shapes') renderShapes(main);
+  else if (st.view === 'instruments') renderInstruments(main, st);
   else if (st.view === 'capo') renderCapo(main, st);
   else if (st.view === 'sessions') renderSessions(main, st);
   else renderPractice(main, st);

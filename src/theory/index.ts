@@ -13,3 +13,4 @@ export * from './tab';
 export * from './melodygen';
 export * from './backing';
 export * from './pitch';
+export * from './instruments';

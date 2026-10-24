@@ -1,6 +1,6 @@
-import { type Note, n, noteName, SCALES, CHORDS } from './theory';
+import { type Note, type BassStyle, n, noteName, SCALES, CHORDS } from './theory';
 
-export type View = 'circle' | 'fretboard' | 'modes' | 'shapes' | 'melody' | 'capo' | 'practice' | 'sessions';
+export type View = 'circle' | 'fretboard' | 'modes' | 'shapes' | 'instruments' | 'melody' | 'capo' | 'practice' | 'sessions';
 export type Pattern = 'none' | 'caged' | '3nps';
 export type QuizKind = 'note' | 'fret-interval' | 'ear-interval' | 'ear-chord';
 export type MelodyTab = 'warmups' | 'tunes' | 'licks' | 'random' | 'changes';
@@ -43,6 +43,18 @@ export interface State {
   /** Triad string set, as index of the lowest string. */
   triadSet: number;
   modesView: 'parallel' | 'relative';
+  /* Mandolin & bass */
+  instrument: 'mandolin' | 'bass';
+  bassStrings: 4 | 5;
+  instShow: 'scale' | 'chord';
+  /** Mandolin position start fret, or -1 for the whole neck. */
+  mandoPos: number;
+  /** Selected mandolin grip, as its fret list (e.g. "0023"). */
+  instGrip: string | null;
+  /** Bass arpeggio box: the root string, or -1 for the whole neck. */
+  bassBox: number;
+  bassStyle: BassStyle;
+  bassProg: number;
 }
 
 const initial: State = {
@@ -71,6 +83,14 @@ const initial: State = {
   warmupId: 'open-strings',
   triadSet: 3,
   modesView: 'parallel',
+  instrument: 'mandolin',
+  bassStrings: 4,
+  instShow: 'scale',
+  mandoPos: -1,
+  instGrip: null,
+  bassBox: -1,
+  bassStyle: 'root-five',
+  bassProg: 0,
 };
 
 type Listener = (s: State) => void;
@@ -98,6 +118,7 @@ function writeHash(): void {
     chord: state.chordId,
     mode: state.fretMode,
   });
+  if (state.view === 'instruments') p.set('inst', state.instrument);
   history.replaceState(null, '', `#${state.view}?${p.toString()}`);
 }
 
@@ -106,7 +127,7 @@ export function fromHash(): Partial<State> {
   const [view, query = ''] = location.hash.replace(/^#/, '').split('?');
   const p = new URLSearchParams(query);
   const out: Partial<State> = {};
-  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'shapes' || view === 'melody' || view === 'capo' || view === 'practice' || view === 'sessions') out.view = view;
+  if (view === 'circle' || view === 'fretboard' || view === 'modes' || view === 'shapes' || view === 'instruments' || view === 'melody' || view === 'capo' || view === 'practice' || view === 'sessions') out.view = view;
   try {
     if (p.get('root')) out.root = n(p.get('root')!);
   } catch {
@@ -118,5 +139,7 @@ export function fromHash(): Partial<State> {
   if (chord && CHORDS.some((x) => x.id === chord)) out.chordId = chord;
   const mode = p.get('mode');
   if (mode === 'scale' || mode === 'chord' || mode === 'caged' || mode === 'triads' || mode === 'notes') out.fretMode = mode;
+  const inst = p.get('inst');
+  if (inst === 'mandolin' || inst === 'bass') out.instrument = inst;
   return out;
 }

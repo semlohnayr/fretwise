@@ -854,7 +854,7 @@ svg.tab { display: block; width: 100%; min-width: 640px; max-width: 980px; heigh
 #metro-toggle { margin-left: 0; }
 
 /* Icon-only header buttons on narrower screens (the label stays for screen readers). */
-@media (max-width: 1180px) {
+@media (max-width: 1380px) {
   .sound span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .sound { padding: 6px 9px; }
 }
@@ -1105,3 +1105,17 @@ h3 { font-size: 1.05rem; margin: 18px 0 6px; }
   .lead { font-size: 10pt; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------- Mandolin & bass ---------- */
+.inst-tuning { margin: 4px 0 0; }
+.inst-info { margin-top: 12px; }
+.inst-info .h3-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.inst-info h3 { margin: 0; }
+.grip-group { margin-top: 14px; }
+.grip-group h4 { margin: 0 0 2px; font-size: 1rem; }
+.grip-group .hint { margin: 0 0 4px; }
+.bass-lines { margin-top: 22px; }
+.bass-lines .control-row { margin: 8px 0; }
+.bass-lines .h3-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+.progression-line { font-weight: 600; margin: 6px 0; }
+.bass-tab svg.tab { width: 100%; max-width: 980px; height: auto; }

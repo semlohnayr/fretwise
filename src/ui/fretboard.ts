@@ -229,7 +229,7 @@ function drawNps(g: Geo, pos: NpsPosition): SVGElement {
 
 /* ---------- Chord diagrams ---------- */
 
-function chordDiagram(v: Voicing, intervals: Interval[], strings: number): SVGElement {
+export function chordDiagram(v: Voicing, intervals: Interval[], strings: number): SVGElement {
   const fretted = v.frets.filter((f): f is number => f !== null && f > 0);
   const maxF = fretted.length ? Math.max(...fretted) : 0;
   const start = maxF <= 5 ? 1 : v.baseFret;

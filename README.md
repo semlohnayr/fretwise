@@ -25,6 +25,11 @@ An interactive guitar and music theory workbench that runs in the browser. Its v
 **Chord chart**
 - A static page with every movable CAGED shape for all 13 chord types (major through dim7), one row per chord type and one column per shape. Dots are labelled by interval and R marks the root, so you slide a shape until R sits on the root you want. It has a Print button and a print layout.
 
+**Mandolin & bass**
+- Mandolin (G D A E): any scale or chord on the neck, seven-fret positions (two frets per finger) from open position up, open chord grips, and every movable chop shape for the chosen chord type. Tap a grip to hear it and see it on the neck.
+- Bass guitar (4- or 5-string): scales and chord tones on the neck, one-position arpeggio boxes from a root on any low string, and root–fifth or walking bass lines over the key's progressions, shown as tab and playable with the metronome.
+- Mandolin and bass tunings are also in the Fretboard page's Neck settings.
+
 **Sound**
 - A built-in plucked-string synth (Karplus–Strong, no samples). Select any note on the neck to hear it; play scales, positions, chords, triads, every chord in a key, progressions, and modes over a drone.
 - The Sound button in the header mutes everything and remembers your choice.
@@ -112,6 +117,7 @@ src/
     fretboard.ts   Tunings, fret maths, absolute pitch, CAGED, 3NPS, triad voicings
     voicings.ts    Playable chord voicing generator
     capo.ts        Capo calculator
+    instruments.ts Mandolin chop shapes and positions, bass boxes and bass lines
     quiz.ts        Practice question generators (seedable)
     tempo.ts       Tempo ramp, tap tempo and click-pattern helpers
     abc.ts         ABC notation parser, repeats, parts and timelines
@@ -124,6 +130,7 @@ src/
     fretboard.ts   Fretboard view
     modes.ts       Modes view
     shapes.ts      Chord chart page (movable CAGED shapes)
+    instruments.ts Mandolin & bass page
     capo.ts        Capo view
     practice.ts    Practice quizzes
     metronome.ts   Metronome dock

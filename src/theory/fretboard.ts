@@ -5,9 +5,16 @@ export interface Tuning {
   name: string;
   /** Open strings from lowest-pitched (6th string on guitar) to highest. */
   strings: Note[];
+  /** MIDI pitch of the lowest open string, for instruments outside the guitar's range. */
+  lowMidi?: number;
 }
 
-const t = (id: string, name: string, s: string): Tuning => ({ id, name, strings: s.split(' ').map(n) });
+const t = (id: string, name: string, s: string, lowMidi?: number): Tuning => ({ id, name, strings: s.split(' ').map(n), ...(lowMidi ? { lowMidi } : {}) });
+
+/** Other fretted instruments. Mandolin pairs (courses) are drawn as one string. */
+export const MANDOLIN: Tuning = t('mandolin', 'Mandolin (G D A E)', 'G D A E', 55);
+export const BASS4: Tuning = t('bass', 'Bass (E A D G)', 'E A D G', 28);
+export const BASS5: Tuning = t('bass5', '5-string bass (B E A D G)', 'B E A D G', 23);
 
 export const TUNINGS: Tuning[] = [
   t('standard', 'Standard (E A D G B E)', 'E A D G B E'),
@@ -20,6 +27,9 @@ export const TUNINGS: Tuning[] = [
   t('open-e', 'Open E', 'E B E G# B E'),
   t('open-c', 'Open C', 'C G C G C E'),
   t('drop-c', 'Drop C', 'C G C F A D'),
+  MANDOLIN,
+  BASS4,
+  BASS5,
 ];
 
 export function parseTuning(text: string): Tuning {
@@ -192,7 +202,9 @@ export function stringMidis(tn: Tuning): number[] {
   const out: number[] = [];
   tn.strings.forEach((s, i) => {
     const p = pc(s);
-    if (i === 0) {
+    if (i === 0 && tn.lowMidi !== undefined) {
+      out.push(tn.lowMidi);
+    } else if (i === 0) {
       let m = 36 + p; // C2 + pitch class
       if (m < 35) m += 12;
       if (m > 46) m -= 12;

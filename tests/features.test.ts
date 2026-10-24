@@ -4,6 +4,7 @@ import {
   capoOptions, translateCapo, keyLabel, seeded, noteFindQuestion, fretIntervalQuestion, earIntervalQuestion,
   cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS, movableShape,
   chordQuizQuestion, fretPc, BASIC_INTERVALS, parseTuning,
+  MANDOLIN, BASS4, BASS5, openGrips, closedGrips, mandolinPositions, arpeggioBox, bassLine, harmonize, mod,
 } from '../src/theory';
 import { renderString, midiToHz } from '../src/audio';
 
@@ -223,5 +224,76 @@ describe('CAGED chord list', () => {
   it('lists every chord type with shapes, starting with the triads', () => {
     expect([...CAGED_CHORD_IDS].sort()).toEqual(Object.keys(CAGED_CHORDS).sort());
     expect(CAGED_CHORD_IDS.slice(0, 3)).toEqual(['maj', 'min', '7']);
+  });
+});
+
+describe('mandolin and bass', () => {
+  const semis = (id: string) => chordById(id).formula.map((i) => i.semitones);
+
+  it('instrument tunings sit in their own octaves', () => {
+    expect(stringMidis(MANDOLIN)).toEqual([55, 62, 69, 76]);
+    expect(stringMidis(BASS4)).toEqual([28, 33, 38, 43]);
+    expect(stringMidis(BASS5)).toEqual([23, 28, 33, 38, 43]);
+  });
+
+  it('standard open mandolin chords are found', () => {
+    const open = (r: string, id: string) => openGrips(MANDOLIN, pc(n(r)), semis(id), 3).map((g) => g.frets.join(''));
+    expect(open('G', 'maj')).toContain('0023');
+    expect(open('C', 'maj')).toContain('0230');
+    expect(open('D', 'maj')).toContain('2002');
+    expect(open('A', 'min')).toContain('2230');
+    expect(open('E', 'min')).toContain('0220');
+    expect(open('D', '7')).toContain('2032');
+  });
+
+  it('chop shapes are closed, contain every chord tone, and appear once', () => {
+    for (const r of ['C', 'G', 'Bb', 'F#']) {
+      for (const id of ['maj', 'min', '7', 'm7', 'maj7']) {
+        const grips = closedGrips(MANDOLIN, pc(n(r)), semis(id));
+        expect(grips.length).toBeGreaterThan(0);
+        const shapes = new Set<string>();
+        for (const g of grips) {
+          expect(g.frets.every((f) => f >= 1)).toBe(true);
+          expect(g.hi - g.lo).toBeLessThanOrEqual(3);
+          for (const t of semis(id).map((x) => x % 12)) expect(g.tones).toContain(t);
+          g.frets.forEach((f, i) => expect(g.tones[i]).toBe(mod(fretPc(MANDOLIN, i, f) - pc(n(r)), 12)));
+          const key = g.frets.map((f) => f - g.lo).join('-');
+          expect(shapes.has(key)).toBe(false);
+          shapes.add(key);
+        }
+      }
+    }
+    // The classic G chop at the 7th fret.
+    expect(closedGrips(MANDOLIN, pc(n('G')), semis('maj')).map((g) => g.frets.join('-'))).toContain('7-5-5-7');
+  });
+
+  it('mandolin positions put the root under the first finger', () => {
+    const ps = mandolinPositions(MANDOLIN, pc(n('A')));
+    expect(ps[0].start).toBe(0);
+    for (const p of ps.slice(1)) expect(fretPc(MANDOLIN, p.rootString!, p.start)).toBe(pc(n('A')));
+  });
+
+  it('bass arpeggio box stays in one four-fret position', () => {
+    const box = arpeggioBox(BASS4, pc(n('A')), semis('maj'), 0);
+    expect(box.rootFret).toBe(5);
+    expect(box.start).toBe(4);
+    expect(box.notes.map((x) => x.semis)).toEqual([0, 4, 7, 12, 16]);
+    for (const x of box.notes) expect(x.fret - box.start).toBeLessThan(4);
+  });
+
+  it('bass lines: root-fifth and walking', () => {
+    const ch = harmonize(n('G'), scaleById('ionian'));
+    const prog = [1, 4, 5, 1].map((d) => ch[d - 1]);
+    const rf = bassLine(BASS4, prog, 'root-five');
+    expect(rf.map((x) => x.midi)).toEqual([31, 38, 36, 31, 38, 33, 31, 38]);
+    const walk = bassLine(BASS4, prog, 'walking');
+    expect(walk.length).toBe(16);
+    // Each bar's last note is a half step from the next bar's root.
+    for (let bar = 0; bar < 4; bar++) {
+      const approach = walk[bar * 4 + 3].midi;
+      const next = walk[((bar + 1) % 4) * 4].midi;
+      expect(Math.abs(approach - next)).toBe(1);
+    }
+    for (const x of walk) expect(x.midi).toBeGreaterThanOrEqual(28);
   });
 });
