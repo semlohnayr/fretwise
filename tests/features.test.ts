@@ -4,7 +4,7 @@ import {
   capoOptions, translateCapo, keyLabel, seeded, noteFindQuestion, fretIntervalQuestion, earIntervalQuestion,
   cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS, movableShape,
   chordQuizQuestion, fretPc, BASIC_INTERVALS, parseTuning,
-  MANDOLIN, BASS4, BASS5, openGrips, closedGrips, mandolinPositions, arpeggioBox, bassLine, harmonize, mod,
+  MANDOLIN, BASS4, BASS5, cagedShapes, cagedBoxTest, MODES, parentMajor, openGrips, closedGrips, mandolinPositions, arpeggioBox, bassLine, harmonize, mod,
 } from '../src/theory';
 import { renderString, midiToHz } from '../src/audio';
 
@@ -295,5 +295,55 @@ describe('mandolin and bass', () => {
       expect(Math.abs(approach - next)).toBe(1);
     }
     for (const x of walk) expect(x.midi).toBeGreaterThanOrEqual(28);
+  });
+});
+
+describe('CAGED scale boxes', () => {
+  const tn = TUNINGS[0];
+  const opens = stringMidis(tn);
+  const cases: [string, 'major' | 'minor'][] = [
+    ['major-pentatonic', 'major'], ['minor-pentatonic', 'minor'], ['ionian', 'major'], ['aeolian', 'minor'],
+    ['dorian', 'minor'], ['mixolydian', 'major'], ['lydian', 'major'], ['phrygian', 'minor'],
+    ['harmonic-minor', 'minor'], ['melodic-minor', 'minor'], ['blues', 'minor'], ['major-blues', 'major'],
+  ];
+
+  it('every box holds each scale pitch in its span exactly once, in every key', () => {
+    for (const [id, q] of cases) {
+      const sc = scaleById(id);
+      for (const name of ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']) {
+        const root = n(name);
+        const parent = MODES.some((m) => m.id === id) ? pc(parentMajor(root, id)) : undefined;
+        const shapes = cagedShapes(root, q, 15, parent);
+        expect(new Set(shapes.map((x) => x.name)).size).toBe(5);
+        const test = cagedBoxTest(tn, pc(root), sc.formula, q, parent);
+        const pcs = new Set(sc.formula.map((i) => (pc(root) + i.semitones) % 12));
+        for (const sh of shapes) {
+          const per = tn.strings.map((_, s) => {
+            const fs: number[] = [];
+            for (let f = 0; f <= 17; f++) if (test(sh, s, f) && pcs.has(fretPc(tn, s, f))) fs.push(f);
+            return fs;
+          });
+          const midis = per.flatMap((fs, s) => fs.map((f) => opens[s] + f)).sort((a, b) => a - b);
+          expect(new Set(midis).size).toBe(midis.length);
+          for (let m = midis[0]; m <= midis[midis.length - 1]; m++) if (pcs.has(m % 12)) expect(midis).toContain(m);
+          if (id.endsWith('pentatonic')) expect(per.map((x) => x.length)).toEqual([2, 2, 2, 2, 2, 2]);
+        }
+      }
+    }
+  });
+
+  it('E major pentatonic, E shape: the standard box at the 12th fret', () => {
+    const e = cagedShapes(n('E'), 'major', 15).find((x) => x.name === 'E')!;
+    const test = cagedBoxTest(tn, pc(n('E')), scaleById('major-pentatonic').formula, 'major');
+    const pcs = new Set([4, 6, 8, 11, 1]);
+    const per = tn.strings.map((_, s) => [...Array(16).keys()].filter((f) => test(e, s, f) && pcs.has(fretPc(tn, s, f))));
+    expect(per).toEqual([[12, 14], [11, 14], [11, 14], [11, 13], [12, 14], [12, 14]]);
+  });
+
+  it('minor boxes are named after the minor grip they surround', () => {
+    // A minor pentatonic "box 1" (frets 5-8) is the E-shape (Em grip with the root on the 6th string).
+    const e = cagedShapes(n('A'), 'minor', 15).find((x) => x.name === 'E')!;
+    expect(e.window).toEqual([4, 8]);
+    expect(e.strings![0]).toEqual([5, 8]);
   });
 });

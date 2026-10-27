@@ -118,6 +118,17 @@ export interface CagedShape {
   maxFret: number;
   /** Fret window used to box the matching scale position. */
   window: [number, number];
+  /**
+   * Scale boxes only: the fret range on each string (low → high). A box takes
+   * each pitch once, on the string the standard fingering uses for it.
+   */
+  strings?: [number, number][];
+}
+
+/** Is this fret inside the shape's scale box (or its window, for chord shapes)? */
+export function inCagedBox(sh: CagedShape, string: number, fret: number): boolean {
+  const [lo, hi] = sh.strings ? sh.strings[string] : sh.window;
+  return fret >= lo && fret <= hi;
 }
 
 const STANDARD_PCS = [4, 9, 2, 7, 11, 4];
@@ -126,8 +137,105 @@ const STANDARD_PCS = [4, 9, 2, 7, 11, 4];
  * All CAGED chord shapes for a root that fit on the neck (standard tuning),
  * sorted by position. Each shape usually appears once or twice below fret 22.
  */
-export function cagedShapes(root: Note, quality: 'major' | 'minor', maxFret: number): CagedShape[] {
-  return cagedChordShapes(root, quality === 'major' ? 'maj' : 'min', maxFret);
+const IONIAN_SEMIS = [0, 2, 4, 5, 7, 9, 11];
+const AEOLIAN_SEMIS = [0, 2, 3, 5, 7, 8, 10];
+
+/**
+ * A test for "is this fret in the scale box?" that also places notes outside
+ * the parent major scale (a harmonic minor's raised 7th, a blues ♭5): each
+ * goes on the same string as the note it alters, one fret away.
+ */
+export function cagedBoxTest(
+  tn: Tuning,
+  rootPc: number,
+  scale: { degree: number; semitones: number }[],
+  quality: 'major' | 'minor',
+  parentPc?: number,
+): (sh: CagedShape, string: number, fret: number) => boolean {
+  const parent = parentPc ?? (quality === 'major' ? rootPc : mod(rootPc + 3, 12));
+  const parentSet = new Set(IONIAN_SEMIS.map((x) => mod(parent + x, 12)));
+  const ref = quality === 'major' ? IONIAN_SEMIS : AEOLIAN_SEMIS;
+  // Pitch class → how many frets it sits from the parent-scale note it alters.
+  const shift = new Map<number, number>();
+  for (const i of scale) {
+    const p = mod(rootPc + i.semitones, 12);
+    if (parentSet.has(p)) continue;
+    const d = ((i.degree - 1) % 7) + 1;
+    let k = i.semitones - ref[d - 1];
+    if (k > 6) k -= 12;
+    if (k < -6) k += 12;
+    shift.set(p, k);
+  }
+  const opens = stringMidis(tn);
+  return (sh, string, fret) => {
+    const k = shift.get(fretPc(tn, string, fret)) ?? 0;
+    if (inCagedBox(sh, string, fret - k)) return true;
+    // A flattened note whose natural note is an open string can't go behind the
+    // nut, so it moves down a string (an open-position blues ♭5, for example).
+    if (k < 0 && string + 1 < opens.length) {
+      const naturalFretAbove = fret - k - (opens[string + 1] - opens[string]);
+      return naturalFretAbove === 0 && inCagedBox(sh, string + 1, 0);
+    }
+    return false;
+  };
+}
+
+/**
+ * The five CAGED major-scale positions, each as a fret range per string
+ * (low E → high e) relative to the root on the shape's root string. These
+ * are the standard fingerings: every scale note in the box appears once, and
+ * the pentatonic scale inside each box is two notes per string.
+ */
+const SCALE_BOXES: Record<CagedName, { ref: number; ranges: [number, number][] }> = {
+  // Root on the 5th string under the pinky (C chord grip x32010).
+  C: { ref: 1, ranges: [[-3, 0], [-3, 0], [-3, 0], [-3, 0], [-3, 0], [-3, 0]] },
+  // Root on the 5th string under the index finger (A chord grip x02220).
+  A: { ref: 1, ranges: [[-1, 2], [-1, 2], [-1, 2], [-1, 2], [0, 3], [0, 3]] },
+  // Root on the 6th string under the pinky (G chord grip 320003); the index stretches back on the G string.
+  G: { ref: 0, ranges: [[-3, 0], [-3, 0], [-3, 0], [-4, -1], [-3, 0], [-3, 0]] },
+  // Root on the 6th string under the middle finger (E chord grip 022100).
+  E: { ref: 0, ranges: [[-1, 2], [-1, 2], [-1, 2], [-1, 2], [-1, 2], [-1, 2]] },
+  // Root on the 4th string (D chord grip xx0232).
+  D: { ref: 2, ranges: [[0, 3], [0, 3], [-1, 2], [-1, 2], [0, 3], [0, 3]] },
+};
+
+/**
+ * A minor key uses the boxes of its relative major. Named after the minor
+ * chord grip each box surrounds: the relative major's G shape surrounds the
+ * Em-shape grip, its C shape the Am shape, and so on.
+ */
+const MINOR_NAME: Record<CagedName, CagedName> = { G: 'E', C: 'A', E: 'D', D: 'C', A: 'G' };
+
+/**
+ * CAGED scale boxes for a key, lowest first. The boxes come from the parent
+ * major scale (the key itself for major, its relative major for minor, and
+ * the mode's parent for a mode such as Dorian), so every note of the scale
+ * has a place in each box. Each box is named after the chord grip on the
+ * key's own root that sits inside it. A box that would need frets behind the
+ * nut is shown 12 frets higher, where it fits whole.
+ */
+export function cagedShapes(root: Note, quality: 'major' | 'minor', maxFret: number, parentPc?: number): CagedShape[] {
+  const majorPc = parentPc ?? (quality === 'major' ? pc(root) : mod(pc(root) + 3, 12));
+  const grips = cagedChordShapes(root, quality === 'major' ? 'maj' : 'min', 36);
+  const out: CagedShape[] = [];
+  for (const major of CAGED_ORDER) {
+    const box = SCALE_BOXES[major];
+    const lo = Math.min(...box.ranges.map((x) => x[0]));
+    const hi = Math.max(...box.ranges.map((x) => x[1]));
+    let r = mod(majorPc - STANDARD_PCS[box.ref], 12);
+    while (r + lo < 0) r += 12;
+    for (; r + hi <= maxFret; r += 12) {
+      const strings = box.ranges.map(([a, b]) => [r + a, r + b] as [number, number]);
+      const window: [number, number] = [r + lo, r + hi];
+      // The grip of the key's own chord that fits the box best names it.
+      const fit = (g: CagedShape) => g.frets.reduce<number>((n, f, s) => n + (f !== null && f >= strings[s][0] && f <= strings[s][1] ? 1 : 0), 0);
+      const best = grips.reduce<CagedShape | undefined>((b, g) => (!b || fit(g) > fit(b) ? g : b), undefined);
+      const name = majorPc === pc(root) || !best ? (quality === 'major' ? major : MINOR_NAME[major]) : best.name;
+      const grip = grips.filter((g) => g.name === name).sort((a, b) => fit(b) - fit(a))[0];
+      out.push({ name, frets: grip ? grip.frets : box.ranges.map(() => null), minFret: window[0], maxFret: window[1], window, strings });
+    }
+  }
+  return out.sort((a, b) => a.minFret - b.minFret);
 }
 
 /** Every instance of every CAGED shape for a chord type that fits below `maxFret`, low to high. */

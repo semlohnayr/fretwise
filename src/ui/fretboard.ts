@@ -1,9 +1,9 @@
 import {
   type Interval, type Note, type Tuning, type CagedShape, type TriadVoicing, type NpsPosition, type Voicing,
   SCALES, CHORDS, TUNINGS, scaleById, chordById, scaleNotes, chordNotes, chordSymbol,
-  noteName, pc, fretPc, isStandard, parseTuning, cagedShapes, cagedChordShapes, CAGED_CHORDS, CAGED_CHORD_IDS, CAGED_ORDER, triadVoicings, threeNps,
+  noteName, pc, fretPc, isStandard, parseTuning, cagedShapes, cagedChordShapes, inCagedBox, cagedBoxTest, CAGED_CHORDS, CAGED_CHORD_IDS, CAGED_ORDER, triadVoicings, threeNps,
   chordVoicings, voicingName, stringMidis,
-  INVERSION_NAMES, intervalLabel, intervalName, tuningLabel,
+  INVERSION_NAMES, intervalLabel, intervalName, tuningLabel, MODES, parentMajor,
 } from '../theory';
 import { getState, setState, type State, type FretMode, type Pattern } from '../state';
 import { h, s, select, segmented, disclosure, pageTitle } from './dom';
@@ -194,8 +194,15 @@ function drawCaged(g: Geo, shapes: CagedShape[], focus: string): SVGElement {
   return layer;
 }
 
-function inWindow(sh: CagedShape, fret: number): boolean {
-  return fret >= sh.window[0] && fret <= sh.window[1];
+/** The parent major of a mode (D Dorian → C), so its CAGED boxes hold every note. Other scales use the default. */
+function scaleParentPc(st: State): number | undefined {
+  return MODES.some((m) => m.id === st.scaleId) ? pc(parentMajor(st.root, st.scaleId)) : undefined;
+}
+
+let boxTest: (sh: CagedShape, string: number, fret: number) => boolean = inCagedBox;
+
+function inWindow(sh: CagedShape, string: number, fret: number): boolean {
+  return boxTest(sh, string, fret);
 }
 
 function drawTriads(g: Geo, voicings: TriadVoicing[], r: Resolved, st: State, opens: number[]): SVGElement {
@@ -423,8 +430,11 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     ? []
     : isChordView(st)
       ? cagedChordShapes(st.root, st.fretMode === 'caged' ? cagedChordId(st) : st.chordId, st.frets)
-      : cagedShapes(st.root, r.cagedQuality!, st.frets);
+      : cagedShapes(st.root, r.cagedQuality!, st.frets, scaleParentPc(st));
   const focusShapes = cagedActive && st.caged !== 'all' ? shapes.filter((x) => x.name === st.caged) : [];
+  boxTest = cagedActive && !isChordView(st) && r.cagedQuality
+    ? cagedBoxTest(tn, pc(st.root), r.intervals, r.cagedQuality, scaleParentPc(st))
+    : inCagedBox;
   const npsAll = pattern === '3nps' ? threeNps(tn, pc(st.root), r.intervals.map((i) => i.semitones), st.frets) : [];
   const nps = npsAll.find((p) => p.number === st.npsPosition);
   const npsSet = new Set<string>();
@@ -459,7 +469,7 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
         let extra = '';
         if (chosen) extra = chosenSet.has(key) ? 'grip' : 'faded';
         else {
-          if (focusShapes.length) extra = focusShapes.some((sh) => inWindow(sh, f)) ? '' : 'faded';
+          if (focusShapes.length) extra = focusShapes.some((sh) => inWindow(sh, str, f)) ? '' : 'faded';
           if (nps) extra = npsSet.has(key) ? '' : 'faded';
           if (grip.has(key)) extra += ' grip';
         }
@@ -481,6 +491,7 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     const notes: GuideNote[] = [];
     tn.strings.forEach((_, str) => {
       for (let f = sh.window[0]; f <= sh.window[1]; f++) {
+        if (!inWindow(sh, str, f)) continue;
         const midi = opens[str] + f;
         if (r.marks.has(fretPc(tn, str, f)) && !seen.has(midi)) {
           seen.add(midi);
@@ -500,7 +511,7 @@ export function renderFretboard(root: HTMLElement, st: State = getState()): void
     const focused = nps
       ? nps.frets.flatMap((fs, str) => fs.map((f) => opens[str] + f))
       : focusShapes.length
-        ? positionsIn(tn, r, opens, st.frets, (f) => focusShapes.some((sh) => inWindow(sh, f)))
+        ? positionsIn(tn, r, opens, st.frets, (str, f) => focusShapes.some((sh) => inWindow(sh, str, f)))
         : null;
     play = playButton(focused ? 'Play this position' : 'Play scale', () => {
       const run = focused ?? scaleMidis(pc(st.root), semis);
@@ -629,10 +640,10 @@ function effectivePattern(st: State, tn: Tuning, r: Resolved): Pattern {
 }
 
 /** Pitches of all marked notes inside a fret window, low to high, without repeats. */
-function positionsIn(tn: Tuning, r: Resolved, opens: number[], frets: number, inside: (f: number) => boolean): number[] {
+function positionsIn(tn: Tuning, r: Resolved, opens: number[], frets: number, inside: (string: number, f: number) => boolean): number[] {
   const out = new Set<number>();
   tn.strings.forEach((_, str) => {
-    for (let f = 0; f <= frets; f++) if (inside(f) && r.marks.has(fretPc(tn, str, f))) out.add(opens[str] + f);
+    for (let f = 0; f <= frets; f++) if (inside(str, f) && r.marks.has(fretPc(tn, str, f))) out.add(opens[str] + f);
   });
   return [...out].sort((a, b) => a - b);
 }
