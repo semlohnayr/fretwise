@@ -123,15 +123,24 @@ export interface CagedShape {
    * each pitch once, on the string the standard fingering uses for it.
    */
   strings?: [number, number][];
+  /**
+   * Scale boxes in first position: frets below each string's range that also
+   * belong to the box (the open string, and anything between it and the
+   * range that the string below doesn't already cover).
+   */
+  open?: number[][];
 }
 
 /** Is this fret inside the shape's scale box (or its window, for chord shapes)? */
 export function inCagedBox(sh: CagedShape, string: number, fret: number): boolean {
   const [lo, hi] = sh.strings ? sh.strings[string] : sh.window;
+  if (sh.open?.[string]?.includes(fret)) return true;
   return fret >= lo && fret <= hi;
 }
 
 const STANDARD_PCS = [4, 9, 2, 7, 11, 4];
+/** Semitones from each string to the next one up in standard tuning. */
+const STANDARD_GAPS = [5, 5, 5, 4, 5];
 
 /**
  * All CAGED chord shapes for a root that fit on the neck (standard tuning),
@@ -167,9 +176,21 @@ export function cagedBoxTest(
     shift.set(p, k);
   }
   const opens = stringMidis(tn);
-  return (sh, string, fret) => {
+  const test = (sh: CagedShape, string: number, fret: number): boolean => {
+    // Near the nut, a fret below the range defers to the string below if that already plays the pitch.
+    if (sh.strings && fret > 0 && fret < sh.strings[string][0] && string > 0) {
+      const below = fret + opens[string] - opens[string - 1];
+      if (inner(sh, string - 1, below)) return false;
+    }
+    return inner(sh, string, fret);
+  };
+  const inner = (sh: CagedShape, string: number, fret: number): boolean => {
     const k = shift.get(fretPc(tn, string, fret)) ?? 0;
-    if (inCagedBox(sh, string, fret - k)) return true;
+    if (k === 0) return inCagedBox(sh, string, fret);
+    // An altered note goes next to its natural note's fretted position in the box (not next to an open string).
+    const [lo, hi] = sh.strings ? sh.strings[string] : sh.window;
+    const natural = fret - k;
+    if ((natural >= lo && natural <= hi) || (natural > 0 && sh.open?.[string]?.includes(natural))) return true;
     // A flattened note whose natural note is an open string can't go behind the
     // nut, so it moves down a string (an open-position blues ♭5, for example).
     if (k < 0 && string + 1 < opens.length) {
@@ -178,6 +199,7 @@ export function cagedBoxTest(
     }
     return false;
   };
+  return test;
 }
 
 /**
@@ -226,13 +248,34 @@ export function cagedShapes(root: Note, quality: 'major' | 'minor', maxFret: num
     while (r + lo < 0) r += 12;
     for (; r + hi <= maxFret; r += 12) {
       const strings = box.ranges.map(([a, b]) => [r + a, r + b] as [number, number]);
-      const window: [number, number] = [r + lo, r + hi];
+      // Near the nut, open strings are part of the position: the index finger
+      // is on fret 1 or 2, so an open string is a note you play without shifting.
+      const open = strings.map(([a], s) => {
+        if (a <= 0 || a > 2) return [];
+        const extra = [0];
+        for (let f = 1; f < a; f++) {
+          // Skip a fret whose pitch the string below already plays inside the box.
+          const below = s > 0 ? f + STANDARD_GAPS[s - 1] : -1;
+          if (s === 0 || below < strings[s - 1][0] || below > strings[s - 1][1]) extra.push(f);
+        }
+        return extra;
+      });
+      const hasOpen = open.some((x) => x.length > 0);
+      const window: [number, number] = [hasOpen ? 0 : r + lo, r + hi];
       // The grip of the key's own chord that fits the box best names it.
       const fit = (g: CagedShape) => g.frets.reduce<number>((n, f, s) => n + (f !== null && f >= strings[s][0] && f <= strings[s][1] ? 1 : 0), 0);
       const best = grips.reduce<CagedShape | undefined>((b, g) => (!b || fit(g) > fit(b) ? g : b), undefined);
       const name = majorPc === pc(root) || !best ? (quality === 'major' ? major : MINOR_NAME[major]) : best.name;
       const grip = grips.filter((g) => g.name === name).sort((a, b) => fit(b) - fit(a))[0];
-      out.push({ name, frets: grip ? grip.frets : box.ranges.map(() => null), minFret: window[0], maxFret: window[1], window, strings });
+      out.push({
+        name,
+        frets: grip ? grip.frets : box.ranges.map(() => null),
+        minFret: r + lo,
+        maxFret: r + hi,
+        window,
+        strings,
+        ...(hasOpen ? { open } : {}),
+      });
     }
   }
   return out.sort((a, b) => a.minFret - b.minFret);

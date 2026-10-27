@@ -323,10 +323,15 @@ describe('CAGED scale boxes', () => {
             for (let f = 0; f <= 17; f++) if (test(sh, s, f) && pcs.has(fretPc(tn, s, f))) fs.push(f);
             return fs;
           });
-          const midis = per.flatMap((fs, s) => fs.map((f) => opens[s] + f)).sort((a, b) => a - b);
+          // Fretted notes: each pitch once, nothing skipped. (Open strings near the nut may double a fretted note.)
+          const fretted = per.map((fs, s) => fs.filter((f) => f > 0 || !sh.open?.[s]?.length));
+          const midis = fretted.flatMap((fs, s) => fs.map((f) => opens[s] + f)).sort((a, b) => a - b);
           expect(new Set(midis).size).toBe(midis.length);
-          for (let m = midis[0]; m <= midis[midis.length - 1]; m++) if (pcs.has(m % 12)) expect(midis).toContain(m);
-          if (id.endsWith('pentatonic')) expect(per.map((x) => x.length)).toEqual([2, 2, 2, 2, 2, 2]);
+          const all = per.flatMap((fs, s) => fs.map((f) => opens[s] + f));
+          for (let m = Math.min(...all); m <= Math.max(...all); m++) if (pcs.has(m % 12)) expect(all).toContain(m);
+          if (id.endsWith('pentatonic')) expect(fretted.map((x) => x.length)).toEqual([2, 2, 2, 2, 2, 2]);
+          // Open strings count only for boxes at the nut.
+          if (per.some((fs) => fs.includes(0))) expect(sh.window[0]).toBe(0);
         }
       }
     }
@@ -338,6 +343,19 @@ describe('CAGED scale boxes', () => {
     const pcs = new Set([4, 6, 8, 11, 1]);
     const per = tn.strings.map((_, s) => [...Array(16).keys()].filter((f) => test(e, s, f) && pcs.has(fretPc(tn, s, f))));
     expect(per).toEqual([[12, 14], [11, 14], [11, 14], [11, 13], [12, 14], [12, 14]]);
+  });
+
+  it('E major pentatonic, D shape: open strings in scale belong to the box', () => {
+    const d = cagedShapes(n('E'), 'major', 15).find((x) => x.name === 'D')!;
+    const test = cagedBoxTest(tn, pc(n('E')), scaleById('major-pentatonic').formula, 'major');
+    // Low E, B and high E ring open; A, D and G are not in the scale.
+    expect(tn.strings.map((_, s) => test(d, s, 0))).toEqual([true, true, true, true, true, true]);
+    const pcs = new Set([4, 6, 8, 11, 1]);
+    const open = tn.strings.map((_, s) => test(d, s, 0) && pcs.has(fretPc(tn, s, 0)));
+    expect(open).toEqual([true, false, false, false, true, true]);
+    // A box higher up has no open strings.
+    const c = cagedShapes(n('E'), 'major', 15).find((x) => x.name === 'C')!;
+    expect(c.open).toBeUndefined();
   });
 
   it('minor boxes are named after the minor grip they surround', () => {
